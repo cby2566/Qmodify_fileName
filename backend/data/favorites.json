@@ -1,0 +1,10 @@
+[
+  {
+    "id": "4e7a99175bf44500b134a0b932f5fd81",
+    "name": "动漫分组提取",
+    "pattern": "^\\[(?P<group>.+?)\\]\\s*(?P<title>.+?)\\s*\\[(?P<quality>\\d+p)\\]",
+    "description": "提取字幕组、标题、画质",
+    "created_at": "2026-07-07T11:43:37.034175",
+    "last_used_at": null
+  }
+]
