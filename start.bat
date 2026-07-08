@@ -1,61 +1,99 @@
-﻿@echo off
+@echo off
+setlocal
 chcp 65001 >nul
+cd /d "%~dp0"
+
 echo ============================================
-echo    文件批量重命名工具 - 启动脚本
+echo    File Renamer - Startup Script
 echo ============================================
 echo.
 
-REM 检查 Python
-python --version >nul 2>&1
-if errorlevel 1 (
-    echo [错误] 未检测到 Python，请先安装 Python 3.10+
+REM Check Python 3.10+
+set "PYTHON_CMD="
+call :detect_python python
+if not defined PYTHON_CMD call :detect_python py -3
+if not defined PYTHON_CMD (
+    echo [ERROR] Python 3.10+ was not found.
+    echo Install Python 3.10+ and enable "Add python.exe to PATH".
+    echo If backend\venv is invalid, this script will rebuild it automatically.
     pause
     exit /b 1
 )
 
-REM 检查 Node.js
+REM Check Node.js
 node --version >nul 2>&1
 if errorlevel 1 (
-    echo [错误] 未检测到 Node.js，请先安装 Node.js 18+
+    echo [ERROR] Node.js was not found. Install Node.js 18+ first.
     pause
     exit /b 1
 )
 
-REM 创建虚拟环境并安装后端依赖
-if not exist "backend\venv" (
-    echo [1/4] 创建 Python 虚拟环境...
-    python -m venv backend\venv
-)
-
-echo [2/4] 安装后端依赖...
-call backend\venv\Scripts\activate.bat
-pip install -r backend\requirements.txt
-call backend\venv\Scripts\deactivate.bat
-
-REM 安装前端依赖
-if not exist "frontend\node_modules" (
-    echo [3/4] 安装前端依赖...
-    cd frontend
-    npm install
-    cd ..
+REM Create or repair the virtual environment
+set "VENV_PY=backend\venv\Scripts\python.exe"
+set "RECREATE_VENV=0"
+if not exist "%VENV_PY%" (
+    set "RECREATE_VENV=1"
 ) else (
-    echo [3/4] 前端依赖已存在，跳过安装
+    "%VENV_PY%" -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>&1
+    if errorlevel 1 set "RECREATE_VENV=1"
 )
 
-REM 启动服务
-echo [4/4] 启动服务...
+if "%RECREATE_VENV%"=="1" (
+    echo [1/4] Creating or repairing Python virtual environment...
+    if exist "backend\venv" rmdir /s /q "backend\venv"
+    %PYTHON_CMD% -m venv backend\venv
+    if errorlevel 1 (
+        echo [ERROR] Failed to create Python virtual environment.
+        pause
+        exit /b 1
+    )
+) else (
+    echo [1/4] Backend virtual environment is available, skipping creation.
+)
+
+echo [2/4] Installing backend dependencies...
+"%VENV_PY%" -m pip install -r backend\requirements.txt
+if errorlevel 1 (
+    echo [ERROR] Failed to install backend dependencies.
+    pause
+    exit /b 1
+)
+
+REM Install frontend dependencies
+if not exist "frontend\node_modules" (
+    echo [3/4] Installing frontend dependencies...
+    cd /d "%~dp0frontend"
+    npm install
+    if errorlevel 1 (
+        echo [ERROR] Failed to install frontend dependencies.
+        pause
+        exit /b 1
+    )
+    cd /d "%~dp0"
+) else (
+    echo [3/4] Frontend dependencies already exist, skipping installation.
+)
+
+REM Start services
+echo [4/4] Starting services...
 echo.
 
-start "文件重命名工具 - 后端" cmd /k "cd backend && venv\Scripts\activate && python -m uvicorn main:app --reload --port 8000"
+start "File Renamer - Backend" cmd /k "cd /d ""%~dp0backend"" && venv\Scripts\python.exe -m uvicorn main:app --reload --port 8099"
 timeout /t 3 /nobreak >nul
-start "文件重命名工具 - 前端" cmd /k "cd frontend && npm run dev"
+start "File Renamer - Frontend" cmd /k "cd /d ""%~dp0frontend"" && npm run dev"
 
 echo.
 echo ============================================
-echo    服务启动中...
-echo    后端: http://localhost:8000
-echo    前端: http://localhost:5173
+echo    Services are starting...
+echo    Backend:  http://localhost:8099
+echo    Frontend: http://localhost:5173
 echo ============================================
 echo.
-echo 按任意键退出此窗口（服务将继续运行）
+echo Press any key to close this window. Services will keep running.
 pause >nul
+exit /b 0
+
+:detect_python
+%* -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>&1
+if not errorlevel 1 set "PYTHON_CMD=%*"
+exit /b 0

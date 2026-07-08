@@ -76,14 +76,14 @@ cd backend
 python -m venv venv
 venv\\Scripts\\activate
 pip install -r requirements.txt
-python -m uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --reload --port 8099
 `
 
 如果是在 PowerShell 中已激活的环境：
 
 `powershell
 .\\venv\\Scripts\\Activate.ps1
-uvicorn main:app --reload --port 8000
+uvicorn main:app --reload --port 8099
 `
 
 **终端 2 — 前端：**

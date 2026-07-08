@@ -1,4 +1,4 @@
-﻿import sqlite3
+import sqlite3
 import uuid
 import datetime
 from pathlib import Path
