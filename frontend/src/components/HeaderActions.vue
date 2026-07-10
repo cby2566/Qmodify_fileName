@@ -1,19 +1,33 @@
 <template>
   <div class="header-actions">
-    <el-autocomplete
-      v-model="pathInput"
-      :fetch-suggestions="queryHistory"
-      placeholder="输入目录路径，如 D:\Downloads"
-      style="width: 320px"
-      clearable
-      @keyup.enter="scanPath"
-      @select="pathInput = $event.value"
-    />
+    <div class="path-input-wrap">
+      <el-autocomplete
+        v-model="pathInput"
+        :fetch-suggestions="queryPaths"
+        placeholder="输入目录路径，如 D:\Downloads"
+        class="path-input"
+        clearable
+        :trigger-on-focus="true"
+        @keyup.enter="scanPath"
+        @select="handlePathSelect"
+        @blur="validatePathInput"
+      >
+        <template #default="{ item }">
+          <div class="path-option">
+            <span class="path-option-label">{{ item.label }}</span>
+            <span class="path-option-value">{{ item.value }}</span>
+          </div>
+        </template>
+      </el-autocomplete>
+      <span v-if="pathStatus.message" class="path-status" :class="pathStatus.type">
+        {{ pathStatus.message }}
+      </span>
+    </div>
     <el-button type="primary" @click="scanPath" :loading="fileStore.loading">
       <el-icon><FolderOpened /></el-icon>
       扫描
     </el-button>
-    <el-button @click="pickDirectory">
+    <el-button @click="pickDirectoryPath" :loading="pickingDirectory">
       <el-icon><Folder /></el-icon>
       浏览
     </el-button>
@@ -39,24 +53,85 @@ import { Folder, FolderOpened, Document, Star, Setting } from '@element-plus/ico
 import { useFileStore } from '../stores/files'
 import { useSettingsStore } from '../stores/settings'
 import { ElMessage } from 'element-plus'
+import { getCommonDirectories, getPathSuggestions, pickDirectory, validateDirectory } from '../api'
 import { getScanHistory, addScanHistory } from '../utils'
 
 const emit = defineEmits(['showLogs', 'showFavorites', 'showSettings'])
 const fileStore = useFileStore()
 const settingsStore = useSettingsStore()
 const pathInput = ref('')
+const pickingDirectory = ref(false)
+const commonDirectories = ref([])
+const pathStatus = ref({ type: '', message: '' })
 
-function queryHistory(queryString, cb) {
-  const history = getScanHistory()
-  const results = queryString
-    ? history.filter(p => p.toLowerCase().includes(queryString.toLowerCase()))
-    : history
-  cb(results.map(value => ({ value })))
+function formatSuggestion(value, label, kind) {
+  return {
+    value,
+    label: label || value,
+    kind
+  }
+}
+
+function historySuggestions(queryString) {
+  const query = queryString.toLowerCase()
+  return getScanHistory()
+    .filter(p => !query || p.toLowerCase().includes(query))
+    .map(path => formatSuggestion(path, '历史记录', 'history'))
+}
+
+async function queryPaths(queryString, cb) {
+  const history = historySuggestions(queryString)
+  try {
+    const { suggestions = [] } = await getPathSuggestions(queryString, 12)
+    const merged = [...history, ...suggestions]
+    const seen = new Set()
+    cb(merged.filter(item => {
+      const key = item.value.toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    }))
+  } catch {
+    const shortcuts = commonDirectories.value
+      .filter(item => !queryString || item.path.toLowerCase().includes(queryString.toLowerCase()))
+      .map(item => formatSuggestion(item.path, item.label, item.kind))
+    cb([...history, ...shortcuts])
+  }
+}
+
+function handlePathSelect(item) {
+  pathInput.value = item.value
+  validatePathInput()
+}
+
+async function validatePathInput() {
+  const path = pathInput.value.trim()
+  if (!path) {
+    pathStatus.value = { type: '', message: '' }
+    return false
+  }
+  try {
+    const result = await validateDirectory(path)
+    pathStatus.value = {
+      type: result.exists && result.is_directory ? 'valid' : 'invalid',
+      message: result.message
+    }
+    if (result.path) pathInput.value = result.path
+    return result.exists && result.is_directory
+  } catch {
+    pathStatus.value = { type: 'invalid', message: '无法校验目录' }
+    return false
+  }
 }
 
 async function scanPath() {
   if (!pathInput.value.trim()) {
     ElMessage.warning('请输入目录路径')
+    return
+  }
+  const valid = await validatePathInput()
+  if (!valid) {
+    ElMessage.warning(pathStatus.value.message || '目录不可用')
     return
   }
   const exts = settingsStore.settings.target_extensions
@@ -68,23 +143,84 @@ async function scanPath() {
   ElMessage.success(`已扫描 ${fileStore.files.length} 个文件`)
 }
 
-async function pickDirectory() {
-  if ('showDirectoryPicker' in window) {
-    try {
-      const handle = await window.showDirectoryPicker()
-      pathInput.value = handle.name
-      // 注意：浏览器安全限制，showDirectoryPicker 返回的是 handle，不是路径
-      // 这里需要用户手动输入完整路径
-      ElMessage.info('由于浏览器安全限制，请手动输入完整路径后点击扫描')
-    } catch (e) {
-      // 用户取消
-    }
-  } else {
-    ElMessage.warning('当前浏览器不支持目录选择，请手动输入路径')
+async function pickDirectoryPath() {
+  pickingDirectory.value = true
+  try {
+    const { path } = await pickDirectory(pathInput.value.trim())
+    if (!path) return
+    pathInput.value = path
+    await scanPath()
+  } catch (e) {
+    ElMessage.error(e.message || '打开文件夹选择器失败')
+  } finally {
+    pickingDirectory.value = false
   }
 }
+
+onMounted(async () => {
+  try {
+    const { directories = [] } = await getCommonDirectories()
+    commonDirectories.value = directories
+  } catch {
+    commonDirectories.value = []
+  }
+})
 </script>
 
 <style scoped>
-.header-actions { display: flex; gap: 8px; align-items: center; }
+.header-actions {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+.path-input-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 560px;
+  min-width: 420px;
+  max-width: 760px;
+}
+.path-input {
+  width: 100%;
+}
+.path-status {
+  font-size: 12px;
+  line-height: 14px;
+}
+.path-status.valid {
+  color: #529b2e;
+}
+.path-status.invalid {
+  color: #c45656;
+}
+.path-option {
+  display: grid;
+  gap: 2px;
+  line-height: 1.3;
+  padding: 3px 0;
+}
+.path-option-label {
+  font-size: 12px;
+  color: #606266;
+}
+.path-option-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .header-actions {
+    flex-wrap: wrap;
+  }
+
+  .path-input-wrap {
+    flex-basis: 100%;
+    max-width: none;
+  }
+}
 </style>
