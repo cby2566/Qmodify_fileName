@@ -2,12 +2,13 @@
   <div class="file-table-container">
     <el-table
       :data="paginatedFiles"
+      :row-key="row => row.full_path"
       stripe
       height="100%"
       @selection-change="onSelectionChange"
       v-loading="fileStore.loading"
     >
-      <el-table-column type="selection" width="50" :selectable="isSelectable" />
+      <el-table-column type="selection" width="50" :selectable="isSelectable" reserve-selection />
       <el-table-column prop="filename" label="当前文件名" min-width="250" show-overflow-tooltip />
       <el-table-column label="新文件名" min-width="250" show-overflow-tooltip>
         <template #default="{ row }">
@@ -42,7 +43,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useFileStore } from '../stores/files'
 import { useRenameStore } from '../stores/rename'
@@ -58,6 +59,16 @@ const paginatedFiles = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
   return fileStore.filteredFiles.slice(start, start + pageSize.value)
 })
+
+watch(
+  () => fileStore.filteredFiles.length,
+  total => {
+    const maxPage = Math.max(1, Math.ceil(total / pageSize.value))
+    if (currentPage.value > maxPage) {
+      currentPage.value = maxPage
+    }
+  }
+)
 
 function onSelectionChange(selected) {
   fileStore.selectedFiles = selected
@@ -126,11 +137,7 @@ function handleRemove(row) {
     '确认移除',
     { confirmButtonText: '移除', cancelButtonText: '取消', type: 'warning' }
   ).then(() => {
-    const idx = fileStore.filteredFiles.findIndex(f => f.full_path === row.full_path)
-    if (idx >= 0) {
-      fileStore.filteredFiles.splice(idx, 1)
-    }
-    fileStore.selectedFiles = fileStore.selectedFiles.filter(f => f.full_path !== row.full_path)
+    fileStore.removeFilesByPaths([row.full_path])
     ElMessage.success('已从列表中移除')
   }).catch(() => {})
 }
