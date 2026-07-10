@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from services import log_service
-from routers import files, regex, rename, favorites, logs, export, settings
+from routers import files, regex, rename, favorites, logs, export, settings, desktop
 from routers import open as open_router
 
 
@@ -35,6 +35,7 @@ app.include_router(logs.router)
 app.include_router(export.router)
 app.include_router(settings.router)
 app.include_router(open_router.router)
+app.include_router(desktop.router)
 
 
 @app.get("/health")
