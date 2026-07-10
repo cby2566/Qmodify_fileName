@@ -5,7 +5,7 @@
         <el-option v-for="ext in availableExtensions" :key="ext" :label="ext" :value="ext" />
       </el-select>
       <el-input v-model="filterKeyword" placeholder="文件名关键词" style="width: 180px" clearable @input="onKeywordInput" />
-      <el-select v-model="filterMode" style="width: 80px">
+      <el-select v-model="filterMode" style="width: 80px" @change="applyFilters">
         <el-option label="包含" value="include" />
         <el-option label="排除" value="exclude" />
       </el-select>
@@ -15,6 +15,10 @@
         <el-button @click="fileStore.selectNone()">全不选</el-button>
         <el-button @click="fileStore.invertSelection()">反选</el-button>
       </el-button-group>
+      <el-button type="danger" plain @click="removeSelected" :disabled="!fileStore.selectedFiles.length">
+        <el-icon><Delete /></el-icon>
+        移除已选({{ fileStore.selectedFiles.length }})
+      </el-button>
       <el-divider direction="vertical" />
       <el-button type="success" @click="generatePreview" :disabled="!renameStore.rules.length">
         <el-icon><Refresh /></el-icon>
@@ -30,7 +34,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { Refresh, Check } from '@element-plus/icons-vue'
+import { Refresh, Check, Delete } from '@element-plus/icons-vue'
 import { useFileStore } from '../stores/files'
 import { useRenameStore } from '../stores/rename'
 import { useSettingsStore } from '../stores/settings'
@@ -68,6 +72,24 @@ async function generatePreview() {
     ElMessage.success('预览生成完成，共 ' + renameStore.stats.total + ' 个文件')
   } catch (e) {
     ElMessage.error(e?.message || String(e))
+  }
+}
+
+async function removeSelected() {
+  const count = fileStore.selectedFiles.length
+  if (!count) return
+  try {
+    await ElMessageBox.confirm(
+      '确定要从列表中移除已选的 ' + count + ' 个文件吗？此操作不会删除磁盘文件。',
+      '确认批量移除',
+      { confirmButtonText: '移除', cancelButtonText: '取消', type: 'warning' }
+    )
+    fileStore.removeFilesByPaths(fileStore.selectedFiles.map(f => f.full_path))
+    ElMessage.success('已从列表中移除 ' + count + ' 个文件')
+  } catch (e) {
+    if (e !== 'cancel' && e !== 'close') {
+      ElMessage.error(e?.message || String(e))
+    }
   }
 }
 
