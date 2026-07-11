@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any
 DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "settings.json"
 
 DEFAULTS = {
-    "target_extensions": [".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".tar.gz", ".tar.bz2", ".tar.xz"],
+    "target_extensions": [".txt", ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".tar.gz", ".tar.bz2", ".tar.xz"],
     "default_recursive": False,
     "max_scan_depth": 5,
     "log_retention_days": 30,
@@ -50,3 +50,4 @@ def update_settings(updates: Dict[str, Any]) -> Dict[str, Any]:
 def reset_settings() -> Dict[str, Any]:
     _save(dict(DEFAULTS))
     return dict(DEFAULTS)
+

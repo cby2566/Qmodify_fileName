@@ -45,6 +45,7 @@ import { ElMessage } from 'element-plus'
 const settingsStore = useSettingsStore()
 
 const extensionOptions = [
+  { value: '.txt', label: '.txt' },
   { value: '.zip', label: '.zip' },
   { value: '.rar', label: '.rar' },
   { value: '.7z', label: '.7z' },
