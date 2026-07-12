@@ -7,6 +7,7 @@ Requirements:
 - MUST use Python for all text file reading and writing.
 - MUST NOT use PowerShell Set-Content, Add-Content, Out-File, shell redirection (>, >>), or Get-Content for text manipulation.
 - MUST NOT touch binary files (images, archives, compiled artifacts).
+- MUST NOT use `python -c` for multi-line scripts; use a temporary `.py` file instead.
 
 Editing rules:
 
