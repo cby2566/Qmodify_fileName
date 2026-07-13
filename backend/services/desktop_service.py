@@ -1,14 +1,6 @@
 import platform
-import subprocess
 from pathlib import Path
 from typing import List, Optional
-
-
-def pick_directory(initial_dir: Optional[str] = None) -> Optional[str]:
-    """Open a native folder picker and return the selected absolute path."""
-    if platform.system() == "Windows":
-        return _pick_directory_windows(initial_dir)
-    return _pick_directory_tk(initial_dir)
 
 
 def get_common_directories() -> List[dict]:
@@ -100,66 +92,6 @@ def suggest_directories(query: str = "", limit: int = 12) -> List[dict]:
         if len(deduped) >= limit:
             break
     return deduped
-
-
-def _pick_directory_windows(initial_dir: Optional[str]) -> Optional[str]:
-    script = r"""
-Add-Type -AssemblyName System.Windows.Forms
-$dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-$dialog.Description = '选择要扫描的文件夹'
-$dialog.ShowNewFolderButton = $false
-if ($args.Count -gt 0 -and $args[0] -and (Test-Path -LiteralPath $args[0])) {
-    $dialog.SelectedPath = $args[0]
-}
-$result = $dialog.ShowDialog()
-if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-    Write-Output $dialog.SelectedPath
-}
-"""
-    args = [
-        "powershell",
-        "-NoProfile",
-        "-STA",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-Command",
-        script,
-    ]
-    if initial_dir:
-        args.append(initial_dir)
-
-    completed = subprocess.run(
-        args,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=300,
-    )
-    if completed.returncode != 0:
-        raise RuntimeError(completed.stderr.strip() or "Failed to open folder picker")
-
-    selected = completed.stdout.strip()
-    return str(Path(selected).resolve()) if selected else None
-
-
-def _pick_directory_tk(initial_dir: Optional[str]) -> Optional[str]:
-    import tkinter as tk
-    from tkinter import filedialog
-
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes("-topmost", True)
-    try:
-        selected = filedialog.askdirectory(
-            initialdir=initial_dir or None,
-            title="选择要扫描的文件夹",
-            mustexist=True,
-        )
-        return str(Path(selected).resolve()) if selected else None
-    finally:
-        root.destroy()
 
 
 def _resolve_user_path(path: Optional[str]) -> str:

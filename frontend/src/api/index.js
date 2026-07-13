@@ -10,19 +10,6 @@ export async function scanDirectory(path, extensions, recursive = false, maxDept
   return Array.isArray(data) ? { files: data } : data
 }
 
-export async function pickDirectory(initialDir = '') {
-  const res = await fetch(`${API_BASE}/desktop/pick-directory`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initial_dir: initialDir || null })
-  })
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}))
-    throw new Error(data.detail || '打开文件夹选择器失败')
-  }
-  return res.json()
-}
-
 export async function getCommonDirectories() {
   const res = await fetch(`${API_BASE}/desktop/common-directories`)
   if (!res.ok) throw new Error('获取常用目录失败')
