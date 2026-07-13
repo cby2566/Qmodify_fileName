@@ -9,12 +9,6 @@
         <el-option label="包含" value="include" />
         <el-option label="排除" value="exclude" />
       </el-select>
-      <el-divider direction="vertical" />
-      <el-button-group>
-        <el-button @click="fileStore.selectAll()">全选</el-button>
-        <el-button @click="fileStore.selectNone()">全不选</el-button>
-        <el-button @click="fileStore.invertSelection()">反选</el-button>
-      </el-button-group>
       <el-button type="danger" plain @click="removeSelected" :disabled="!fileStore.selectedFiles.length">
         <el-icon><Delete /></el-icon>
         移除已选({{ fileStore.selectedFiles.length }})

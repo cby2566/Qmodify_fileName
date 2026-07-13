@@ -104,19 +104,6 @@ export const useFileStore = defineStore('files', () => {
     }
   }
 
-  function selectAll() {
-    selectedFiles.value = [...filteredFiles.value]
-  }
-
-  function selectNone() {
-    selectedFiles.value = []
-  }
-
-  function invertSelection() {
-    const selectedPaths = new Set(selectedFiles.value.map(f => f.full_path))
-    selectedFiles.value = filteredFiles.value.filter(f => !selectedPaths.has(f.full_path))
-  }
-
   function removeFilesByPaths(paths) {
     const pathSet = new Set(paths)
     files.value = files.value.filter(f => !pathSet.has(f.full_path))
@@ -127,6 +114,6 @@ export const useFileStore = defineStore('files', () => {
   return {
     files, filteredFiles, selectedFiles, currentPath, loading, filters,
     totalSize, selectedSize,
-    scan, applyFilters, syncRenamedFiles, toggleFile, selectAll, selectNone, invertSelection, removeFilesByPaths
+    scan, applyFilters, syncRenamedFiles, toggleFile, removeFilesByPaths
   }
 })
