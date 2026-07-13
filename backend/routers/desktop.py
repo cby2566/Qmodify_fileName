@@ -1,16 +1,10 @@
-from typing import Optional
-
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from services import desktop_service
 
 
 router = APIRouter(prefix="/desktop", tags=["desktop"])
-
-
-class PickDirectoryRequest(BaseModel):
-    initial_dir: Optional[str] = None
 
 
 class PathSuggestionRequest(BaseModel):
@@ -20,15 +14,6 @@ class PathSuggestionRequest(BaseModel):
 
 class ValidateDirectoryRequest(BaseModel):
     path: str
-
-
-@router.post("/pick-directory")
-def pick_directory(req: PickDirectoryRequest):
-    try:
-        path = desktop_service.pick_directory(req.initial_dir)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    return {"path": path}
 
 
 @router.get("/common-directories")

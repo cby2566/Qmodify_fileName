@@ -27,10 +27,6 @@
       <el-icon><FolderOpened /></el-icon>
       扫描
     </el-button>
-    <el-button @click="pickDirectoryPath" :loading="pickingDirectory">
-      <el-icon><Folder /></el-icon>
-      浏览
-    </el-button>
     <el-divider direction="vertical" />
     <el-button @click="$emit('showLogs')">
       <el-icon><Document /></el-icon>
@@ -49,18 +45,17 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Folder, FolderOpened, Document, Star, Setting } from '@element-plus/icons-vue'
+import { FolderOpened, Document, Star, Setting } from '@element-plus/icons-vue'
 import { useFileStore } from '../stores/files'
 import { useSettingsStore } from '../stores/settings'
 import { ElMessage } from 'element-plus'
-import { getCommonDirectories, getPathSuggestions, pickDirectory, validateDirectory } from '../api'
+import { getCommonDirectories, getPathSuggestions, validateDirectory } from '../api'
 import { getScanHistory, addScanHistory } from '../utils'
 
 const emit = defineEmits(['showLogs', 'showFavorites', 'showSettings'])
 const fileStore = useFileStore()
 const settingsStore = useSettingsStore()
 const pathInput = ref('')
-const pickingDirectory = ref(false)
 const commonDirectories = ref([])
 const pathStatus = ref({ type: '', message: '' })
 
@@ -141,20 +136,6 @@ async function scanPath() {
   addScanHistory(pathInput.value.trim())
   console.log(fileStore.files)
   ElMessage.success(`已扫描 ${fileStore.files.length} 个文件`)
-}
-
-async function pickDirectoryPath() {
-  pickingDirectory.value = true
-  try {
-    const { path } = await pickDirectory(pathInput.value.trim())
-    if (!path) return
-    pathInput.value = path
-    await scanPath()
-  } catch (e) {
-    ElMessage.error(e.message || '打开文件夹选择器失败')
-  } finally {
-    pickingDirectory.value = false
-  }
 }
 
 onMounted(async () => {
