@@ -3,7 +3,8 @@ from typing import List
 
 
 class Settings(BaseModel):
-    target_extensions: List[str] = [".txt", ".jpg", ".png", ".pdf", ".docx"]
+    available_extensions: List[str] = [".txt", ".zip", ".rar", ".7z"]
+    target_extensions: List[str] = [".txt", ".zip", ".rar", ".7z"]
     default_recursive: bool = False
     max_scan_depth: int = 5
     log_retention_days: int = 30
