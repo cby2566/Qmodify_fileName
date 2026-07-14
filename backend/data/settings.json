@@ -1,0 +1,19 @@
+{
+  "available_extensions": [
+    ".7z",
+    ".rar",
+    ".txt",
+    ".zip"
+  ],
+  "target_extensions": [
+    ".txt",
+    ".zip",
+    ".rar",
+    ".7z"
+  ],
+  "default_recursive": false,
+  "max_scan_depth": 5,
+  "log_retention_days": 30,
+  "preview_debounce_ms": 300,
+  "open_with": ""
+}

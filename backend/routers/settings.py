@@ -7,6 +7,7 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 
 
 class SettingsUpdate(BaseModel):
+    available_extensions: Optional[List[str]] = None
     target_extensions: Optional[List[str]] = None
     default_recursive: Optional[bool] = None
     max_scan_depth: Optional[int] = None

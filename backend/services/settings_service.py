@@ -1,11 +1,12 @@
 import json
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "settings.json"
 
-DEFAULTS = {
-    "target_extensions": [".txt", ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".tar.gz", ".tar.bz2", ".tar.xz"],
+DEFAULTS: Dict[str, Any] = {
+    "available_extensions": [".txt", ".zip", ".rar", ".7z"],
+    "target_extensions": [".txt", ".zip", ".rar", ".7z"],
     "default_recursive": False,
     "max_scan_depth": 5,
     "log_retention_days": 30,
@@ -14,16 +15,27 @@ DEFAULTS = {
 }
 
 
+def _normalize(data: Dict[str, Any]) -> Dict[str, Any]:
+    # Ensure target ⊆ available: drop targets without a source entry.
+    avail = set(data.get("available_extensions", []))
+    data["target_extensions"] = [
+        t for t in data.get("target_extensions", []) if t in avail
+    ]
+    if "available_extensions" not in data:
+        data["available_extensions"] = list(DEFAULTS["available_extensions"])
+    return data
+
+
 def _load() -> Dict[str, Any]:
     if not DATA_PATH.exists():
-        return dict(DEFAULTS)
+        return _normalize(dict(DEFAULTS))
     try:
         data = json.loads(DATA_PATH.read_text(encoding="utf-8"))
         merged = dict(DEFAULTS)
         merged.update(data)
-        return merged
+        return _normalize(merged)
     except (json.JSONDecodeError, OSError):
-        return dict(DEFAULTS)
+        return _normalize(dict(DEFAULTS))
 
 
 def _save(data: Dict[str, Any]):
@@ -43,6 +55,7 @@ def update_settings(updates: Dict[str, Any]) -> Dict[str, Any]:
     for k, v in updates.items():
         if k in DEFAULTS:
             current[k] = v
+    _normalize(current)
     _save(current)
     return current
 
@@ -50,4 +63,3 @@ def update_settings(updates: Dict[str, Any]) -> Dict[str, Any]:
 def reset_settings() -> Dict[str, Any]:
     _save(dict(DEFAULTS))
     return dict(DEFAULTS)
-

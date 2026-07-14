@@ -4,7 +4,8 @@ import { getSettings, updateSettings } from '../api'
 
 export const useSettingsStore = defineStore('settings', () => {
   const settings = ref({
-    target_extensions: ['.txt', '.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz'],
+    available_extensions: ['.txt', '.zip', '.rar', '.7z'],
+    target_extensions: ['.txt', '.zip', '.rar', '.7z'],
     default_recursive: false,
     max_scan_depth: 3,
     log_retention_days: 90,
@@ -30,4 +31,3 @@ export const useSettingsStore = defineStore('settings', () => {
 
   return { settings, loading, fetch, save }
 })
-
