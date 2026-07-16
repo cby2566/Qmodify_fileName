@@ -1,5 +1,8 @@
 <template>
   <div class="header-actions">
+    <div class="path-status" :class="pathStatus.type">
+        {{ pathStatus.message }}
+    </div>
     <div class="path-input-wrap">
       <el-autocomplete
         v-model="pathInput"
@@ -19,9 +22,6 @@
           </div>
         </template>
       </el-autocomplete>
-      <span v-if="pathStatus.message" class="path-status" :class="pathStatus.type">
-        {{ pathStatus.message }}
-      </span>
     </div>
     <el-button type="primary" @click="scanPath" :loading="fileStore.loading">
       <el-icon><FolderOpened /></el-icon>
