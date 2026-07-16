@@ -175,10 +175,12 @@ npm run dev
 ### 注意事项
 
 - 如果某个文件不匹配正则，模板中引用的字段会缺失，该文件将保持原名不变
-- 模板重组通常需要配合正则表达式使用，单独使用模板只能访问 {__stem__} 和 {__index__}## 项目结构
+- 模板重组通常需要配合正则表达式使用，单独使用模板只能访问 {__stem__} 和 {__index__}
+
+## 项目结构
 
 ```
-file-renamer/
+Qmodify_fileName/
 ├── backend/          # FastAPI 后端
 │   ├── routers/      # API 路由
 │   ├── services/     # 业务逻辑
@@ -272,11 +274,11 @@ fixBOM("frontend/src");
 
 ### 3. 端口被占用
 
-如果 8000 或 5173 已被占用：
+如果 8099 或 5173 已被占用：
 
 ```powershell
 # 查看占用进程
-Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue
+Get-NetTCPConnection -LocalPort 8099 -ErrorAction SilentlyContinue
 Get-NetTCPConnection -LocalPort 5173 -ErrorAction SilentlyContinue
 
 # 结束进程（替换为实际的 OwningProcess）
