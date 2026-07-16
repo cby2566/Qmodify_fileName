@@ -22,9 +22,11 @@
           <el-tag :type="getStatusType(row)" size="small">{{ getStatusText(row) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="140" fixed="right">
+      <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
-          <el-button type="primary" link size="small" @click="handleOpen(row)">打开</el-button>
+          <el-button type="primary" link size="small" @click="handleOpen(row)">
+            {{ getOpenLabel(row) }}
+          </el-button>
           <el-button type="danger" link size="small" @click="handleRemove(row)">删除</el-button>
         </template>
       </el-table-column>
@@ -52,6 +54,8 @@ import { openFile } from '../api'
 
 const fileStore = useFileStore()
 const renameStore = useRenameStore()
+const openResults = ref({})
+
 const currentPage = ref(1)
 const pageSize = ref(100)
 
@@ -118,17 +122,29 @@ function getStatusText(row) {
   if (result.status === 'renamed') return '已重命名'
   return '正常'
 }
-
 const settingsStore = useSettingsStore()
 
 async function handleOpen(row) {
+  openResults.value[row.full_path] = { status: 'loading' }
   const openWith = settingsStore.settings.open_with || ''
   try {
     await openFile(row.full_path, openWith)
+    openResults.value[row.full_path] = { status: "opened" }
     ElMessage.success('已打开')
   } catch (e) {
-    ElMessage.error('打开失败: ' + (e.message || '未知错误'))
+    const message = e.message || '未知错误'
+    openResults.value[row.full_path] = { status: "failed", message }
+    ElMessage.error('打开失败: ' + message)
   }
+}
+
+function getOpenLabel(row) {
+  const result = openResults.value[row.full_path]
+  if (!result) return '打开'
+  if (result.status === 'loading') return '打开中'
+  if (result.status === 'opened') return '已打开'
+  if (result.status === 'failed') return '打开失败'
+  return '打开'
 }
 
 function handleRemove(row) {
