@@ -24,7 +24,9 @@
             :class="[getNewNameClass(row), 'clickable-name', { 'copied-flash': copiedKey === row.full_path }]"
             :title="isCopyableName(getNewName(row)) ? '点击复制' : ''"
             @click="copyName(getNewName(row), row)"
-          >{{ getNewName(row) }}</span>
+          >
+            <span v-for="(seg, idx) in getNewNameSegments(row)" :key="idx" :class="'diff-' + seg.type">{{ seg.text }}</span>
+          </span>
         </template>
       </el-table-column>
       <el-table-column prop="size_display" label="大小" width="100" sortable />
@@ -50,8 +52,8 @@
     </el-table>
     <div class="pagination">
       <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
+        @current-page="currentPage"
+        @page-size="pageSize"
         :page-sizes="[50, 100, 200, 500]"
         :total="fileStore.filteredFiles.length"
         layout="total, sizes, prev, pager, next"
@@ -70,6 +72,7 @@ import { useFileStore } from '../stores/files'
 import { useRenameStore } from '../stores/rename'
 import { useSettingsStore } from '../stores/settings'
 import { openFile } from '../api'
+import { computeFilenameDiff } from '../utils/index'
 import FileDetailDialog from './FileDetailDialog.vue'
 
 const fileStore = useFileStore()
@@ -126,6 +129,13 @@ function getNewNameClass(row) {
   if (result.status === 'unchanged') return 'text-muted'
   if (result.status === 'renamed') return 'text-renamed'
   return 'text-success'
+}
+
+function getNewNameSegments(row) {
+  const result = findPreviewResult(row)
+  if (!result) return [{ text: '-', type: 'unchanged' }]
+  if (result.status === 'renamed') return [{ text: '(已重命名)', type: 'unchanged' }]
+  return computeFilenameDiff(result.original_name, result.new_name)
 }
 
 function isCopyableName(name) {
@@ -237,9 +247,11 @@ function showDetail(row) {
 .file-table-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .pagination { padding: 12px; display: flex; justify-content: center; border-top: 1px solid #e4e7ed; }
 .text-danger { color: #f56c6c; font-weight: 500; }
-.text-success { color: #67c23a; }
+.text-success { color: #3595f5; }
 .text-muted { color: #909399; }
 .text-renamed { color: #409eff; font-style: italic; }
+.diff-added { color: #67c23a; font-weight: 500; }
+.diff-modified { color: #e6a23c; font-weight: 500; }
 .clickable-name { cursor: pointer; }
 .clickable-name:hover { color: #409eff; }
 .clickable-name:not(.clickable-name:hover) { cursor: default; }
