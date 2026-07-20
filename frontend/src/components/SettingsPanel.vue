@@ -58,6 +58,19 @@
       <el-form-item label="预览防抖(ms)">
         <el-input-number v-model="settingsStore.settings.preview_debounce_ms" :min="100" :max="2000" />
       </el-form-item>
+      <el-form-item label="快速添加文本">
+        <el-input
+          v-model="settingsStore.settings.quick_add_text"
+          placeholder="_new"
+          clearable
+        />
+      </el-form-item>
+      <el-form-item label="快速添加模式">
+        <el-radio-group v-model="settingsStore.settings.quick_add_mode">
+          <el-radio value="prefix">加前缀</el-radio>
+          <el-radio value="suffix">加后缀</el-radio>
+        </el-radio-group>
+      </el-form-item>
       <el-form-item>
         <el-button type="primary" :loading="saving" @click="saveSettings">保存设置</el-button>
       </el-form-item>

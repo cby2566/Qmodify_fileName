@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { previewRename, executeRename, undoRename, getHistory } from '../api'
+import { useSettingsStore } from './settings'
 
 export const useRenameStore = defineStore('rename', () => {
   const rules = ref([])
@@ -85,9 +86,55 @@ export const useRenameStore = defineStore('rename', () => {
     return undoRename(batchId)
   }
 
+  function applyQuickAdd(filePath) {
+    const settingsStore = useSettingsStore()
+
+    // Extract just the filename from the full path
+    const lastSep = Math.max(filePath.lastIndexOf('\\'), filePath.lastIndexOf('/'))
+    const fileName = lastSep >= 0 ? filePath.slice(lastSep + 1) : filePath
+
+    // Split filename into basename and extension
+    const lastDot = fileName.lastIndexOf('.')
+    let basename, extension
+    if (lastDot > 0) {
+      basename = fileName.slice(0, lastDot)
+      extension = fileName.slice(lastDot)
+    } else {
+      basename = fileName
+      extension = ''
+    }
+
+    const text = settingsStore.settings.quick_add_text || ''
+    const mode = settingsStore.settings.quick_add_mode || 'prefix'
+    let newFileNameOnly
+    if (mode === 'prefix') {
+      newFileNameOnly = text + basename + extension
+    } else {
+      newFileNameOnly = basename + text + extension
+    }
+
+    const newFullPath = newFileNameOnly
+
+    const entry = {
+      original_path: filePath,
+      new_path: newFullPath,
+      new_name: newFileNameOnly,
+      status: 'normal'
+    }
+
+    const idx = previewResults.value.findIndex(r =>
+      r.original_path === filePath && r.status === 'normal' && r.new_name !== undefined
+    )
+    if (idx >= 0) {
+      previewResults.value[idx] = { ...previewResults.value[idx], ...entry }
+    } else {
+      previewResults.value.push(entry)
+    }
+  }
+
   return {
     rules, previewResults, regexPattern, history, loading, stats,
     addRule, removeRule, updateRule, toggleRule, reorderRules,
-    generatePreview, execute, fetchHistory, undo
+    generatePreview, execute, fetchHistory, undo, applyQuickAdd
   }
 })

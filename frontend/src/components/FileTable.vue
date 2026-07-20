@@ -22,8 +22,9 @@
           <el-tag :type="getStatusType(row)" size="small">{{ getStatusText(row) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="160" fixed="right">
+      <el-table-column label="操作" width="250" fixed="right">
         <template #default="{ row }">
+          <el-button type="warning" link size="small" @click="handleQuickAdd(row)">快速</el-button>
           <el-button type="primary" link size="small" @click="handleOpen(row)">
             {{ getOpenLabel(row) }}
           </el-button>
@@ -145,6 +146,10 @@ function getOpenLabel(row) {
   if (result.status === 'opened') return '已打开'
   if (result.status === 'failed') return '打开失败'
   return '打开'
+}
+
+function handleQuickAdd(row) {
+  renameStore.applyQuickAdd(row.full_path)
 }
 
 function handleRemove(row) {
