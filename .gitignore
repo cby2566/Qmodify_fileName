@@ -19,6 +19,8 @@ dist/
 
 # Database files
 *.db
+*.db-shm
+*.db-wal
 *.sqlite3
 
 # IDE / Editor
