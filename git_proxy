@@ -2,3 +2,5 @@
 proxy = http://127.0.0.1:7890
 [https]
 proxy = http://127.0.0.1:7890
+
+git -c http.proxy="http://127.0.0.1:7890" -c https.proxy="http://127.0.0.1:7890" push origin main
