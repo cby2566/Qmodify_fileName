@@ -1,21 +1,7 @@
-﻿# Test Push
-
-This is a test file created on 2026-07-12 16:10:57 to verify HTTPS + credential store push. [grok modified]
-
-## Multi-AI Attribution Test
-
-This line tests multiple AI co-authors in a single commit.
-
-- ChatGPT: [ChatGPT modified]
-- Gemini: [Gemini modified]
-- Claude: [Claude modified]
-- Codex: [codex modified]
-- Copilot: [Copilot modified]
-- Cursor: [Cursor modified]
-- Windsurf: [Windsurf modified]
-- 通义千问: [通义千问 modified]
-- 文心一言: [文心一言 modified]
-
-## Additional Modification
-
-This line was added on 2026-07-16 to test another commit cycle.
+﻿Co-authored-by: Cursor <cursoragent@cursor.com>
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+Co-authored-by: Codex <codex@openai.com>
+Co-authored-by: Claude <noreply@anthropic.com>
+Co-authored-by: renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+Co-authored-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
