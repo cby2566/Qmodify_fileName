@@ -28,13 +28,17 @@
         </template>
       </el-table-column>
       <el-table-column prop="size_display" label="大小" width="100" sortable />
-      <el-table-column prop="extension" label="类型" width="70" />
+      <el-table-column label="类型" width="70">
+        <template #default="{ row }">
+          <span class="clickable-ext" @click="showDetail(row)">{{ row.extension || '-' }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
           <el-tag :type="getStatusType(row)" size="small">{{ getStatusText(row) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="250" fixed="right">
+      <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
           <el-button type="warning" link size="small" @click="handleQuickAdd(row)">快速</el-button>
           <el-button type="primary" link size="small" @click="handleOpen(row)">
@@ -54,6 +58,8 @@
         background
       />
     </div>
+
+    <FileDetailDialog v-model="detailVisible" :file="detailFile" />
   </div>
 </template>
 
@@ -64,11 +70,14 @@ import { useFileStore } from '../stores/files'
 import { useRenameStore } from '../stores/rename'
 import { useSettingsStore } from '../stores/settings'
 import { openFile } from '../api'
+import FileDetailDialog from './FileDetailDialog.vue'
 
 const fileStore = useFileStore()
 const renameStore = useRenameStore()
 const openResults = ref({})
 const copiedKey = ref('')
+const detailVisible = ref(false)
+const detailFile = ref(null)
 
 const currentPage = ref(1)
 const pageSize = ref(100)
@@ -217,6 +226,11 @@ function handleRemove(row) {
   }).catch(() => {})
 }
 
+function showDetail(row) {
+  detailFile.value = row
+  detailVisible.value = true
+}
+
 </script>
 
 <style scoped>
@@ -227,7 +241,8 @@ function handleRemove(row) {
 .text-muted { color: #909399; }
 .text-renamed { color: #409eff; font-style: italic; }
 .clickable-name { cursor: pointer; }
-.clickable-name:hover { color: #409eff; text-decoration: underline; }
+.clickable-name:hover { color: #409eff; }
 .clickable-name:not(.clickable-name:hover) { cursor: default; }
+.clickable-ext { cursor: pointer; color: #409eff; }
 .copied-flash { background-color: #ecf5ff; border-radius: 2px; }
 </style>
