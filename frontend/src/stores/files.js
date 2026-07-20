@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { scanDirectory, filterFiles } from '../api'
+import { useRenameStore } from './rename'
 
 function basename(p) {
   const idx = p.replace(/\\/g, '/').lastIndexOf('/')
@@ -46,6 +47,7 @@ export const useFileStore = defineStore('files', () => {
       files.value = res.files || []
       filteredFiles.value = [...files.value]
       selectedFiles.value = []
+      useRenameStore().previewResults = []
     } finally {
       loading.value = false
     }
@@ -109,6 +111,10 @@ export const useFileStore = defineStore('files', () => {
     files.value = files.value.filter(f => !pathSet.has(f.full_path))
     filteredFiles.value = filteredFiles.value.filter(f => !pathSet.has(f.full_path))
     selectedFiles.value = selectedFiles.value.filter(f => !pathSet.has(f.full_path))
+    const renameStore = useRenameStore()
+    renameStore.previewResults = renameStore.previewResults.filter(
+      r => !pathSet.has(r.original_path) && !pathSet.has(r.new_path)
+    )
   }
 
   return {

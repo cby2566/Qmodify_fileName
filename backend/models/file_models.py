@@ -8,6 +8,7 @@ class FileInfo(BaseModel):
     extension: str
     size_bytes: int
     size_display: str
+    created_time: str
     modified_time: str
     full_path: str
     parent_dir: str

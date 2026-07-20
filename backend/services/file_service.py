@@ -59,6 +59,9 @@ def scan_directory(
                             extension=entry.suffix,
                             size_bytes=stat.st_size,
                             size_display=_human_size(stat.st_size),
+                            created_time=datetime.datetime.fromtimestamp(
+                                stat.st_ctime
+                            ).isoformat(),
                             modified_time=datetime.datetime.fromtimestamp(
                                 stat.st_mtime
                             ).isoformat(),
