@@ -9,10 +9,22 @@
       v-loading="fileStore.loading"
     >
       <el-table-column type="selection" width="50" :selectable="isSelectable" reserve-selection />
-      <el-table-column prop="filename" label="当前文件名" min-width="250" show-overflow-tooltip />
+      <el-table-column prop="filename" label="当前文件名" min-width="250" show-overflow-tooltip>
+        <template #default="{ row }">
+          <span
+            :class="['clickable-name', { 'copied-flash': copiedKey === row.full_path }]"
+            :title="isCopyableName(row.filename) ? '点击复制' : ''"
+            @click="copyName(row.filename, row)"
+          >{{ row.filename }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="新文件名" min-width="250" show-overflow-tooltip>
         <template #default="{ row }">
-          <span :class="getNewNameClass(row)">{{ getNewName(row) }}</span>
+          <span
+            :class="[getNewNameClass(row), 'clickable-name', { 'copied-flash': copiedKey === row.full_path }]"
+            :title="isCopyableName(getNewName(row)) ? '点击复制' : ''"
+            @click="copyName(getNewName(row), row)"
+          >{{ getNewName(row) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="size_display" label="大小" width="100" sortable />
@@ -56,6 +68,7 @@ import { openFile } from '../api'
 const fileStore = useFileStore()
 const renameStore = useRenameStore()
 const openResults = ref({})
+const copiedKey = ref('')
 
 const currentPage = ref(1)
 const pageSize = ref(100)
@@ -106,6 +119,10 @@ function getNewNameClass(row) {
   return 'text-success'
 }
 
+function isCopyableName(name) {
+  return !!name && name !== '-' && name !== '无变化'
+}
+
 function getStatusType(row) {
   const result = findPreviewResult(row)
   if (!result) return 'info'
@@ -152,6 +169,43 @@ function handleQuickAdd(row) {
   renameStore.applyQuickAdd(row.full_path)
 }
 
+function copyName(name, row) {
+  if (!isCopyableName(name)) {
+    ElMessage.warning('无可复制的内容')
+    return
+  }
+  copiedKey.value = row.full_path
+  setTimeout(() => { copiedKey.value = '' }, 500)
+  writeToClipboard(name)
+}
+
+function writeToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text)
+      .then(() => ElMessage.info('已复制: ' + text))
+      .catch(() => fallbackCopy(text))
+  } else {
+    fallbackCopy(text)
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea')
+  ta.value = text
+  ta.style.position = 'fixed'
+  ta.style.opacity = '0'
+  document.body.appendChild(ta)
+  ta.select()
+  try {
+    // eslint-disable-next-line deprecation
+    document.execCommand('copy')
+    ElMessage.info('已复制: ' + text)
+  } catch {
+    ElMessage.error('复制失败，请手动复制')
+  }
+  document.body.removeChild(ta)
+}
+
 function handleRemove(row) {
   ElMessageBox.confirm(
     '确定要从列表中移除「' + row.filename + '」吗？',
@@ -172,4 +226,8 @@ function handleRemove(row) {
 .text-success { color: #67c23a; }
 .text-muted { color: #909399; }
 .text-renamed { color: #409eff; font-style: italic; }
+.clickable-name { cursor: pointer; }
+.clickable-name:hover { color: #409eff; text-decoration: underline; }
+.clickable-name:not(.clickable-name:hover) { cursor: default; }
+.copied-flash { background-color: #ecf5ff; border-radius: 2px; }
 </style>
