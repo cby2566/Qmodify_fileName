@@ -40,7 +40,7 @@
       <favorites-manager />
     </el-drawer>
 
-    <el-drawer v-model="showSettings" title="设置" size="40%">
+    <el-drawer v-model="showSettings" title="设置" size="40%" body-class="settings-drawer-body">
       <settings-panel />
     </el-drawer>
   </div>
@@ -129,4 +129,9 @@ body.is-resizing-sidebar .sidebar-resizer { background: #d9ecff; }
 body.is-resizing-sidebar { cursor: col-resize; user-select: none; }
 .app-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .app-footer { padding: 10px 20px; background: #ffffff; border-top: 1px solid #e4e7ed; }
+
+/* Settings drawer specific styles */
+.settings-drawer-body {
+  padding-top: 0;
+}
 </style>
