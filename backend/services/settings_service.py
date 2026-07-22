@@ -1,8 +1,14 @@
 import json
+import os
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
-DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "settings.json"
+# 支持环境变量配置数据目录（桌面模式），默认为 backend/data/
+_data_dir = os.environ.get("FILERENAMER_DATA_DIR")
+if _data_dir:
+    DATA_PATH = Path(_data_dir) / "settings.json"
+else:
+    DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "settings.json"
 
 DEFAULTS: Dict[str, Any] = {
     "available_extensions": [".txt", ".zip", ".rar", ".7z"],

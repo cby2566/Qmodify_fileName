@@ -1,10 +1,16 @@
 import sqlite3
 import uuid
 import datetime
+import os
 from pathlib import Path
 from typing import List, Optional, Tuple, Dict, Any
 
-DB_PATH = Path(__file__).resolve().parent.parent / "data" / "logs.db"
+# 支持环境变量配置数据目录（桌面模式），默认为 backend/data/
+_data_dir = os.environ.get("FILERENAMER_DATA_DIR")
+if _data_dir:
+    DB_PATH = Path(_data_dir) / "logs.db"
+else:
+    DB_PATH = Path(__file__).resolve().parent.parent / "data" / "logs.db"
 
 
 def _conn() -> sqlite3.Connection:
