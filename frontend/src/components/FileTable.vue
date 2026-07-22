@@ -1,6 +1,7 @@
 <template>
   <div class="file-table-container">
     <el-table
+      ref="tableRef"
       :data="paginatedFiles"
       :row-key="row => row.full_path"
       stripe
@@ -66,7 +67,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useFileStore } from '../stores/files'
 import { useRenameStore } from '../stores/rename'
@@ -84,6 +85,7 @@ const detailFile = ref(null)
 
 const currentPage = ref(1)
 const pageSize = ref(100)
+const tableRef = ref(null)
 
 const paginatedFiles = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
@@ -96,6 +98,16 @@ watch(
     const maxPage = Math.max(1, Math.ceil(total / pageSize.value))
     if (currentPage.value > maxPage) {
       currentPage.value = maxPage
+    }
+  }
+)
+
+// 监听 selectedFiles 变化，当它被清空时，同步清除表格选择状态
+watch(
+  () => fileStore.selectedFiles.length,
+  (newLength, oldLength) => {
+    if (newLength === 0 && oldLength > 0 && tableRef.value) {
+      tableRef.value.clearSelection()
     }
   }
 )
