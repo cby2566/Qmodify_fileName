@@ -122,9 +122,7 @@ export const useRenameStore = defineStore('rename', () => {
       status: 'normal'
     }
 
-    const idx = previewResults.value.findIndex(r =>
-      r.original_path === filePath && r.status === 'normal' && r.new_name !== undefined
-    )
+    const idx = previewResults.value.findIndex(r => r.original_path === filePath)
     if (idx >= 0) {
       previewResults.value[idx] = { ...previewResults.value[idx], ...entry }
     } else {
@@ -132,9 +130,21 @@ export const useRenameStore = defineStore('rename', () => {
     }
   }
 
+  function resetPreview(filePath) {
+    const idx = previewResults.value.findIndex(r => r.original_path === filePath)
+    if (idx >= 0) {
+      previewResults.value.splice(idx, 1)
+    }
+  }
+
+  function resetPreviews(filePaths) {
+    const pathSet = new Set(filePaths)
+    previewResults.value = previewResults.value.filter(r => !pathSet.has(r.original_path))
+  }
+
   return {
     rules, previewResults, regexPattern, history, loading, stats,
     addRule, removeRule, updateRule, toggleRule, reorderRules,
-    generatePreview, execute, fetchHistory, undo, applyQuickAdd
+    generatePreview, execute, fetchHistory, undo, applyQuickAdd, resetPreview, resetPreviews
   }
 })

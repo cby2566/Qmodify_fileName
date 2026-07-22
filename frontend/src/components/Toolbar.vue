@@ -13,6 +13,10 @@
         <el-icon><Delete /></el-icon>
         移除已选({{ fileStore.selectedFiles.length }})
       </el-button>
+      <el-button type="info" @click="resetSelectedPreviews" :disabled="!hasSelectedPreviews">
+        <el-icon><RefreshLeft /></el-icon>
+        撤销预览({{ selectedPreviewCount }})
+      </el-button>
       <el-divider direction="vertical" />
       <el-button type="success" @click="generatePreview" :disabled="!renameStore.rules.length">
         <el-icon><Refresh /></el-icon>
@@ -28,7 +32,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { Refresh, Check, Delete } from '@element-plus/icons-vue'
+import { Refresh, RefreshLeft, Check, Delete } from '@element-plus/icons-vue'
 import { useFileStore } from '../stores/files'
 import { useRenameStore } from '../stores/rename'
 import { useSettingsStore } from '../stores/settings'
@@ -48,6 +52,14 @@ const availableExtensions = computed(() => {
   return Array.from(exts).sort()
 })
 
+const selectedPreviewCount = computed(() => {
+  return fileStore.selectedFiles.filter(f =>
+    renameStore.previewResults.some(r => r.original_path === f.full_path)
+  ).length
+})
+
+const hasSelectedPreviews = computed(() => selectedPreviewCount.value > 0)
+
 const onKeywordInput = debounce(() => {
   applyFilters()
 }, 300)
@@ -66,6 +78,33 @@ async function generatePreview() {
     ElMessage.success('预览生成完成，共 ' + renameStore.stats.total + ' 个文件')
   } catch (e) {
     ElMessage.error(e?.message || String(e))
+  }
+}
+
+async function resetSelectedPreviews() {
+  const selectedWithPreview = fileStore.selectedFiles.filter(f =>
+    renameStore.previewResults.some(r => r.original_path === f.full_path)
+  )
+
+  if (!selectedWithPreview.length) return
+
+  try {
+    await ElMessageBox.confirm(
+      '确定要撤销已选的 ' + selectedWithPreview.length + ' 个文件的预览修改吗？此操作不可恢复。',
+      '确认批量撤销',
+      {
+        confirmButtonText: '撤销',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    const filePaths = selectedWithPreview.map(f => f.full_path)
+    renameStore.resetPreviews(filePaths)
+    ElMessage.success('已撤销 ' + selectedWithPreview.length + ' 个文件的预览修改')
+  } catch (e) {
+    if (e !== 'cancel' && e !== 'close') {
+      ElMessage.error(e?.message || String(e))
+    }
   }
 }
 

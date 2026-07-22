@@ -38,7 +38,12 @@
       </el-table-column>
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
-          <el-tag :type="getStatusType(row)" size="small">{{ getStatusText(row) }}</el-tag>
+          <el-tag
+            :type="getStatusType(row)"
+            size="small"
+            :class="{ 'clickable-status': isStatusClickable(row) }"
+            @click="handleStatusClick(row)"
+          >{{ getStatusText(row) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="180" fixed="right">
@@ -117,9 +122,7 @@ function onSelectionChange(selected) {
 }
 
 function findPreviewResult(row) {
-  return renameStore.previewResults.find(r =>
-    r.original_path === row.full_path || r.new_path === row.full_path
-  )
+  return renameStore.previewResults.find(r => r.original_path === row.full_path)
 }
 
 function isSelectable(row) {
@@ -171,6 +174,20 @@ function getStatusText(row) {
   if (result.status === 'renamed') return '已重命名'
   return '正常'
 }
+
+function isStatusClickable(row) {
+  const result = findPreviewResult(row)
+  // 只有"正常"、"冲突"、"无变化"状态可以点击撤销
+  return result && result.status !== 'renamed'
+}
+
+function handleStatusClick(row) {
+  if (!isStatusClickable(row)) return
+
+  renameStore.resetPreview(row.full_path)
+  ElMessage.success('已撤销预览修改')
+}
+
 const settingsStore = useSettingsStore()
 
 async function handleOpen(row) {
@@ -269,4 +286,6 @@ function showDetail(row) {
 .clickable-name:not(.clickable-name:hover) { cursor: default; }
 .clickable-ext { cursor: pointer; color: #409eff; }
 .copied-flash { background-color: #ecf5ff; border-radius: 2px; }
+.clickable-status { cursor: pointer; transition: all 0.3s; }
+.clickable-status:hover { opacity: 0.7; transform: scale(1.05); }
 </style>
