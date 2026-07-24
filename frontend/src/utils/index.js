@@ -52,11 +52,45 @@ export function computeFilenameDiff(originalName, newName) {
   }
   if (cur) segments.push(cur)
 
-  // Refine: an 'added' segment that immediately follows a 'removed' segment is a genuine
-  // replacement (modified). This covers both mid-text replacements (surrounded by unchanged)
-  // and full-text replacements (no unchanged neighbors), ensuring replace rules render as orange.
+  // Refine: an 'added' segment that immediately follows a 'removed' segment may contain both
+  // a prefix/suffix addition and a genuine replacement. Split them so the prefix stays 'added'
+  // and only the replacement portion becomes 'modified'.
+  function charBlock(ch) {
+    const c = ch.charCodeAt(0)
+    if (c >= 0x4E00 && c <= 0x9FFF) return 'cjk'
+    if (c >= 0x3040 && c <= 0x309F) return 'hiragana'
+    if (c >= 0x30A0 && c <= 0x30FF) return 'katakana'
+    if (c >= 0xAC00 && c <= 0xD7AF) return 'hangul'
+    if (c >= 0x0020 && c <= 0x007E) return 'ascii'
+    return 'other'
+  }
+
   for (let k = 0; k < segments.length; k++) {
     if (segments[k].type === 'added' && k > 0 && segments[k - 1].type === 'removed') {
+      const removedText = segments[k - 1].text
+      const addedText = segments[k].text
+      const removedBlock = charBlock(removedText[0])
+
+      if (addedText.length > removedText.length) {
+        // Find leading characters whose block differs from the removed text — those are the prefix.
+        let prefixEnd = 0
+        for (let i = 0; i < addedText.length; i++) {
+          if (charBlock(addedText[i]) !== removedBlock) {
+            prefixEnd = i + 1
+          } else {
+            break
+          }
+        }
+        if (prefixEnd > 0 && prefixEnd < addedText.length) {
+          const prefix = addedText.slice(0, prefixEnd)
+          const replacement = addedText.slice(prefixEnd)
+          segments[k].text = replacement
+          segments[k].type = 'modified'
+          segments.splice(k, 0, { type: 'added', text: prefix })
+          continue
+        }
+      }
+      // Fallback: no distinguishable prefix — treat the whole added as a replacement.
       segments[k].type = 'modified'
     }
   }
