@@ -53,8 +53,10 @@ export function computeFilenameDiff(originalName, newName) {
   if (cur) segments.push(cur)
 
   // Refine: an 'added' segment that immediately follows a 'removed' segment may contain both
-  // a prefix/suffix addition and a genuine replacement. Split them so the prefix stays 'added'
-  // and only the replacement portion becomes 'modified'.
+  // a prefix/suffix addition and a genuine replacement. Scan from both ends to separate them:
+  //   - Leading chars in a different character block → prefix (added)
+  //   - Trailing chars in a different character block → suffix (added)
+  //   - Middle chars in the same block → replacement (modified)
   function charBlock(ch) {
     const c = ch.charCodeAt(0)
     if (c >= 0x4E00 && c <= 0x9FFF) return 'cjk'
@@ -72,7 +74,7 @@ export function computeFilenameDiff(originalName, newName) {
       const removedBlock = charBlock(removedText[0])
 
       if (addedText.length > removedText.length) {
-        // Find leading characters whose block differs from the removed text — those are the prefix.
+        // Scan from the LEFT for a distinguishable prefix
         let prefixEnd = 0
         for (let i = 0; i < addedText.length; i++) {
           if (charBlock(addedText[i]) !== removedBlock) {
@@ -81,16 +83,42 @@ export function computeFilenameDiff(originalName, newName) {
             break
           }
         }
-        if (prefixEnd > 0 && prefixEnd < addedText.length) {
-          const prefix = addedText.slice(0, prefixEnd)
-          const replacement = addedText.slice(prefixEnd)
-          segments[k].text = replacement
-          segments[k].type = 'modified'
-          segments.splice(k, 0, { type: 'added', text: prefix })
+
+        // Scan from the RIGHT for a distinguishable suffix
+        let suffixStart = addedText.length
+        for (let i = addedText.length - 1; i >= 0; i--) {
+          if (charBlock(addedText[i]) !== removedBlock) {
+            suffixStart = i
+          } else {
+            break
+          }
+        }
+
+        const prefix = addedText.slice(0, prefixEnd)
+        const suffix = addedText.slice(suffixStart)
+        const replacement = addedText.slice(prefixEnd, suffixStart)
+
+        if (prefix || suffix) {
+          if (replacement.length > 0) {
+            // Replace current segment with the middle (replacement) part
+            segments[k].text = replacement
+            segments[k].type = 'modified'
+
+            if (prefix) {
+              segments.splice(k, 0, { type: 'added', text: prefix })
+            }
+            if (suffix) {
+              // After prefix splice, modified shifts to k+1; without prefix, it stays at k
+              const modifiedIdx = prefix ? k + 1 : k
+              segments.splice(modifiedIdx + 1, 0, { type: 'added', text: suffix })
+            }
+          }
+          // else: replacement is empty (entire added is prefix+suffix with no middle),
+          //       keep the segment as 'added' with the full text — no split needed.
           continue
         }
       }
-      // Fallback: no distinguishable prefix — treat the whole added as a replacement.
+      // No distinguishable prefix/suffix — treat the whole added as a replacement.
       segments[k].type = 'modified'
     }
   }
