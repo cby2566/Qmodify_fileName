@@ -48,7 +48,9 @@ const filterKeyword = ref('')
 const filterMode = ref('include')
 
 const availableExtensions = computed(() => {
-  const exts = new Set(fileStore.files.map(f => f.extension))
+  // Directories report an empty extension; they must not pollute this list.
+  const exts = new Set(fileStore.files.filter(f => !f.is_dir).map(f => f.extension))
+  exts.delete('')
   return Array.from(exts).sort()
 })
 

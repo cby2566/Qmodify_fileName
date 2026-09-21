@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { previewRename, executeRename, undoRename, getHistory } from '../api'
 import { useSettingsStore } from './settings'
+import { useFileStore } from './files'
 
 export const useRenameStore = defineStore('rename', () => {
   const rules = ref([])
@@ -93,15 +94,25 @@ export const useRenameStore = defineStore('rename', () => {
     const lastSep = Math.max(filePath.lastIndexOf('\\'), filePath.lastIndexOf('/'))
     const fileName = lastSep >= 0 ? filePath.slice(lastSep + 1) : filePath
 
-    // Split filename into basename and extension
-    const lastDot = fileName.lastIndexOf('.')
+    // Rename rules operate on the stem for files, but on the whole name for
+    // directories (which have no extension concept). Mirrors the backend
+    // _split_name() helper.
+    const entry = findEntryByPath(filePath)
+    const isDir = !!entry?.is_dir
+
     let basename, extension
-    if (lastDot > 0) {
-      basename = fileName.slice(0, lastDot)
-      extension = fileName.slice(lastDot)
-    } else {
+    if (isDir) {
       basename = fileName
       extension = ''
+    } else {
+      const lastDot = fileName.lastIndexOf('.')
+      if (lastDot > 0) {
+        basename = fileName.slice(0, lastDot)
+        extension = fileName.slice(lastDot)
+      } else {
+        basename = fileName
+        extension = ''
+      }
     }
 
     const text = settingsStore.settings.quick_add_text || ''
@@ -113,21 +124,35 @@ export const useRenameStore = defineStore('rename', () => {
       newFileNameOnly = basename + text + extension
     }
 
-    const newFullPath = newFileNameOnly
+    const lastSepIdx = Math.max(filePath.lastIndexOf('\\'), filePath.lastIndexOf('/'))
+    const parentDir = lastSepIdx >= 0 ? filePath.slice(0, lastSepIdx) : ''
+    const newFullPath = parentDir ? parentDir + filePath[lastSepIdx] + newFileNameOnly : newFileNameOnly
 
-    const entry = {
+    const preview = {
       original_path: filePath,
       new_path: newFullPath,
+      original_name: fileName,
       new_name: newFileNameOnly,
+      is_dir: isDir,
       status: 'normal'
     }
 
     const idx = previewResults.value.findIndex(r => r.original_path === filePath)
     if (idx >= 0) {
-      previewResults.value[idx] = { ...previewResults.value[idx], ...entry }
+      previewResults.value[idx] = { ...previewResults.value[idx], ...preview }
     } else {
-      previewResults.value.push(entry)
+      previewResults.value.push(preview)
     }
+  }
+
+  function findEntryByPath(fullPath) {
+    const fileStore = useFileStore()
+    const pools = [fileStore.files, fileStore.filteredFiles, fileStore.selectedFiles]
+    for (const pool of pools) {
+      const hit = pool?.find(f => f.full_path === fullPath)
+      if (hit) return hit
+    }
+    return null
   }
 
   function resetPreview(filePath) {

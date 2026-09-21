@@ -23,6 +23,15 @@
         </template>
       </el-autocomplete>
     </div>
+    <el-select
+      v-model="targetType"
+      class="target-select"
+      @change="onTargetTypeChange"
+    >
+      <el-option label="文件" value="file" />
+      <el-option label="文件夹" value="dir" />
+      <el-option label="全部" value="all" />
+    </el-select>
     <el-button type="primary" @click="scanPath" :loading="fileStore.loading">
       <el-icon><FolderOpened /></el-icon>
       扫描
@@ -47,6 +56,7 @@
 import { ref, onMounted } from 'vue'
 import { FolderOpened, Document, Star, Setting } from '@element-plus/icons-vue'
 import { useFileStore } from '../stores/files'
+import { useRenameStore } from '../stores/rename'
 import { useSettingsStore } from '../stores/settings'
 import { ElMessage } from 'element-plus'
 import { getCommonDirectories, getPathSuggestions, validateDirectory } from '../api'
@@ -54,10 +64,13 @@ import { getScanHistory, addScanHistory } from '../utils'
 
 const emit = defineEmits(['showLogs', 'showFavorites', 'showSettings'])
 const fileStore = useFileStore()
+const renameStore = useRenameStore()
 const settingsStore = useSettingsStore()
 const pathInput = ref('')
 const commonDirectories = ref([])
 const pathStatus = ref({ type: '', message: '' })
+// Session-level choice; not persisted to settings on purpose.
+const targetType = ref('file')
 
 function formatSuggestion(value, label, kind) {
   return {
@@ -119,6 +132,15 @@ async function validatePathInput() {
   }
 }
 
+function onTargetTypeChange() {
+  // Switching target type invalidates the current list and any preview.
+  fileStore.targetType = targetType.value
+  fileStore.files = []
+  fileStore.filteredFiles = []
+  fileStore.selectedFiles = []
+  renameStore.previewResults = []
+}
+
 async function scanPath() {
   if (!pathInput.value.trim()) {
     ElMessage.warning('请输入目录路径')
@@ -129,13 +151,16 @@ async function scanPath() {
     ElMessage.warning(pathStatus.value.message || '目录不可用')
     return
   }
-  const exts = settingsStore.settings.target_extensions
+  const isDirMode = targetType.value !== 'file'
+  // Directories carry no extension, so the extension filter is meaningless.
+  const exts = isDirMode ? null : settingsStore.settings.target_extensions
   const recursive = settingsStore.settings.default_recursive
   const maxDepth = settingsStore.settings.max_scan_depth
-  await fileStore.scan(pathInput.value.trim(), exts, recursive, maxDepth)
+  await fileStore.scan(pathInput.value.trim(), exts, recursive, maxDepth, targetType.value)
   addScanHistory(pathInput.value.trim())
-  console.log(fileStore.files)
-  ElMessage.success(`已扫描 ${fileStore.files.length} 个文件`)
+  const count = fileStore.files.length
+  const noun = targetType.value === 'file' ? '个文件' : targetType.value === 'dir' ? '个文件夹' : '个条目'
+  ElMessage.success(`已扫描 ${count} ${noun}`)
 }
 
 onMounted(async () => {
@@ -167,6 +192,10 @@ onMounted(async () => {
 }
 .path-input {
   width: 100%;
+}
+.target-select {
+  flex: 0 0 110px;
+  width: 110px;
 }
 .path-status {
   font-size: 12px;

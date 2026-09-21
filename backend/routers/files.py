@@ -14,6 +14,7 @@ def scan_directory(req: ScanRequest):
             extensions=req.extensions,
             recursive=req.recursive,
             max_depth=req.max_depth,
+            target_type=req.target_type,
         )
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))

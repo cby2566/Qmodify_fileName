@@ -65,28 +65,70 @@ def get_batch(batch_id: str):
 
 @router.post("/undo/{batch_id}")
 def undo(batch_id: str):
-    """Undo a rename batch by reversing the operations."""
+    """Undo a rename batch by reversing the operations.
+
+    Operations are replayed shallowest-first so that restoring a parent
+    directory never invalidates a child path still waiting to be restored.
+    Every step is validated before it runs; anything that cannot be restored
+    is reported as ``skipped`` with a reason instead of silently ignored.
+    """
+    from pathlib import Path
+
     batch = log_service.get_batch(batch_id)
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
-    
+
+    ops = [op for op in batch.get("operations", []) if op["status"] == "success"]
+    ops.sort(key=lambda op: rename_service._path_depth(op["new_path"]))
+
     results = []
-    for op in reversed(batch.get("operations", [])):
-        from pathlib import Path
+    for op in ops:
         src = Path(op["new_path"])
         dst = Path(op["original_path"])
-        if src.exists() and not dst.exists():
-            try:
-                src.rename(dst)
-                results.append({"status": "success", "original_path": op["original_path"], "new_path": op["new_path"]})
-            except Exception as e:
-                results.append({"status": "failed", "error": str(e), "original_path": op["original_path"], "new_path": op["new_path"]})
+        if not src.exists():
+            results.append({
+                "status": "skipped",
+                "reason": "renamed_path_missing",
+                "message": f"找不到重命名后的路径：{src}",
+                "original_path": op["original_path"],
+                "new_path": op["new_path"],
+            })
+        elif dst.exists() and rename_service._norm_key(str(src)) != rename_service._norm_key(str(dst)):
+            results.append({
+                "status": "skipped",
+                "reason": "original_path_occupied",
+                "message": f"原路径已被占用：{dst}",
+                "original_path": op["original_path"],
+                "new_path": op["new_path"],
+            })
         else:
-            results.append({"status": "skipped", "reason": "file_missing_or_target_exists", "original_path": op["original_path"], "new_path": op["new_path"]})
-    
+            try:
+                rename_service._safe_rename(src, dst)
+                results.append({
+                    "status": "success",
+                    "message": "restored",
+                    "original_path": op["original_path"],
+                    "new_path": op["new_path"],
+                })
+            except Exception as e:
+                results.append({
+                    "status": "failed",
+                    "error": str(e),
+                    "message": str(e),
+                    "original_path": op["original_path"],
+                    "new_path": op["new_path"],
+                })
+
     # Log the undo operation
     log_service.log_batch(f"undo_{batch_id}", results, directory=batch.get("directory", ""))
-    
+
     succeeded = sum(1 for r in results if r["status"] == "success")
     failed = sum(1 for r in results if r["status"] == "failed")
-    return {"batch_id": batch_id, "succeeded": succeeded, "failed": failed, "results": results}
+    skipped = sum(1 for r in results if r["status"] == "skipped")
+    return {
+        "batch_id": batch_id,
+        "succeeded": succeeded,
+        "failed": failed,
+        "skipped": skipped,
+        "results": results,
+    }

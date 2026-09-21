@@ -1,9 +1,70 @@
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 import re
+import sys
 import uuid
 import datetime
-import shutil
+
+
+def _split_name(path: Path, is_dir: bool) -> Tuple[str, str]:
+    """Return (mutable part, preserved tail) of a path's name.
+
+    Files only transform their stem and keep the extension; directories have
+    no extension concept, so the whole name is transformed.
+    """
+    if is_dir:
+        return path.name, ""
+    return path.stem, path.suffix
+
+
+def _norm_key(path_str: str) -> str:
+    """Normalize a path for conflict comparison.
+
+    Windows filesystems are case-insensitive, so ``A`` and ``a`` collide there.
+    """
+    key = str(Path(path_str)).replace("/", "\\") if sys.platform == "win32" else str(path_str)
+    return key.lower() if sys.platform == "win32" else key
+
+
+def _path_depth(path_str: str) -> int:
+    """Number of path components outside the drive/root (used for ordering).
+
+    ``C:\\a\\b`` -> 2, ``/a/b/c`` -> 3. Deeper paths must be renamed first so
+    that renaming a parent never invalidates a child path mid-batch.
+    """
+    parts = Path(path_str).parts
+    return sum(1 for p in parts if p not in ("\\", "/") and not p.endswith(("\\", ":")))
+
+
+def _is_ancestor(ancestor: str, descendant: str) -> bool:
+    """True when ``ancestor`` is a strict ancestor directory path of ``descendant``."""
+    if ancestor == descendant:
+        return False
+    try:
+        a = Path(ancestor)
+        d = Path(descendant)
+        return a in d.parents
+    except (OSError, ValueError):
+        return False
+
+
+def _mark_parent_child_conflicts(previews: List[dict]) -> None:
+    """Flag batches that rename both a directory and something inside/under it.
+
+    Renaming the parent first would invalidate the child's path, so such
+    batches are rejected at preview time instead of failing mid-execution.
+    """
+    paths = [p["original_path"] for p in previews]
+    for p in previews:
+        if p["status"] != "normal":
+            continue
+        for other in paths:
+            if _is_ancestor(other, p["original_path"]):
+                p["status"] = "conflict"
+                p["conflict_reason"] = (
+                    f"父目录也在本次批次中：{other}"
+                )
+                break
 
 
 def apply_rules(
@@ -95,6 +156,9 @@ def generate_preview(
 
     Returns dicts with original_name, new_name, status.
     Status is one of "normal", "conflict", "unchanged".
+
+    Whether a path is a directory is resolved server-side via ``Path.is_dir()``
+    so the client cannot desync the stem/suffix split.
     """
     from services.regex_service import extract_fields, validate_pattern
 
@@ -110,15 +174,18 @@ def generate_preview(
 
     for idx, fpath in enumerate(files):
         src = Path(fpath)
-        stem = src.stem
+        is_dir = src.is_dir()
+        body, tail = _split_name(src, is_dir)
         fields = extracted_map.get(fpath, {})
-        new_stem = apply_rules(stem, rules, fields, idx)
-        new_name = f"{new_stem}{src.suffix}"
+        new_stem = apply_rules(body, rules, fields, idx)
+        new_name = f"{new_stem}{tail}"
         new_full = str(src.parent / new_name)
 
-        # Track for intra-batch conflict detection
-        new_name_counts.setdefault(new_full, 0)
-        new_name_counts[new_full] += 1
+        # Track for intra-batch conflict detection. Compare case-insensitively
+        # on Windows so that only-case-different targets are caught too.
+        key = _norm_key(new_full)
+        new_name_counts.setdefault(key, 0)
+        new_name_counts[key] += 1
 
         previews.append({
             "original_path": fpath,
@@ -128,43 +195,73 @@ def generate_preview(
             "new_stem": new_stem,
             "status": "unchanged" if new_full == fpath else "normal",
             "index": idx,
+            "is_dir": is_dir,
         })
 
     # Second pass: mark intra-batch conflicts (same new_path from >1 source)
     for p in previews:
-        if new_name_counts[p["new_path"]] > 1:
+        if new_name_counts[_norm_key(p["new_path"])] > 1:
             p["status"] = "conflict"
+            p.setdefault("conflict_reason", "批次内多个条目产生相同的目标名称")
 
-    # Third pass: mark conflicts with existing files on disk
+    # Third pass: mark conflicts with anything existing on disk in the same dir
     existing = set()
     for fpath in files:
         src = Path(fpath)
-        # Also mark all sibling files that exist on disk
         try:
             if src.parent.exists():
-                existing.update(str(x) for x in src.parent.iterdir() if x.is_file())
+                existing.update(_norm_key(str(x)) for x in src.parent.iterdir())
         except OSError:
             pass
 
-    existing -= set(files)  # the original names themselves don't count as conflicts
+    # The original names themselves are not conflicts (they will be vacated).
+    existing -= {_norm_key(f) for f in files}
     for p in previews:
-        if p["status"] == "normal" and p["new_path"] in existing:
+        if p["status"] == "normal" and _norm_key(p["new_path"]) in existing:
             p["status"] = "conflict"
+            p["conflict_reason"] = "目标名称已被占用"
+
+    # Fourth pass: reject batches touching a directory and its own descendants.
+    _mark_parent_child_conflicts(previews)
 
     return previews
 
 
+def _safe_rename(src: Path, dst: Path) -> None:
+    """Rename with a two-step hop for case-only changes.
+
+    Windows may refuse an in-place case rename (``Foo`` -> ``foo``), so route
+    it through a temporary name.
+    """
+    if src.parent == dst.parent and src.name != dst.name and src.name.lower() == dst.name.lower():
+        tmp = src.with_name(f"__rename_tmp_{uuid.uuid4().hex}")
+        src.rename(tmp)
+        try:
+            tmp.rename(dst)
+        except Exception:
+            tmp.rename(src)  # restore the original name on failure
+            raise
+        return
+    src.rename(dst)
+
+
 def execute_rename(operations: List[dict]) -> Tuple[str, List[dict]]:
-    """Execute a list of rename operations.
+    """Execute a list of rename operations as an all-or-nothing batch.
 
     Each dict: {"original_path": ..., "new_path": ...}
+    Operations run deepest-first so that a rename never invalidates a
+    not-yet-processed path. If any step fails, the already-applied steps are
+    rolled back in reverse order before returning.
     Returns (batch_id, results).
     """
     batch_id = uuid.uuid4().hex
     ts = datetime.datetime.now().isoformat()
     results: List[dict] = []
 
-    for op in operations:
+    ordered = sorted(operations, key=lambda op: _path_depth(op["original_path"]), reverse=True)
+    applied: List[Tuple[Path, Path]] = []
+
+    for op in ordered:
         src = Path(op["original_path"])
         dst = Path(op["new_path"])
         if src == dst:
@@ -174,19 +271,24 @@ def execute_rename(operations: List[dict]) -> Tuple[str, List[dict]]:
                 "new_path": str(dst),
                 "status": "success",
                 "message": "unchanged",
+                "is_dir": src.is_dir(),
                 "created_at": ts,
             })
             continue
         try:
-            if dst.exists():
+            if not src.exists():
+                raise FileNotFoundError(f"Source missing: {src}")
+            if dst.exists() and _norm_key(str(src)) != _norm_key(str(dst)):
                 raise FileExistsError(f"Target already exists: {dst}")
-            src.rename(dst)
+            _safe_rename(src, dst)
+            applied.append((src, dst))
             results.append({
                 "batch_id": batch_id,
                 "original_path": str(src),
                 "new_path": str(dst),
                 "status": "success",
                 "message": "renamed",
+                "is_dir": src.is_dir(),
                 "created_at": ts,
             })
         except Exception as e:
@@ -196,7 +298,39 @@ def execute_rename(operations: List[dict]) -> Tuple[str, List[dict]]:
                 "new_path": str(dst),
                 "status": "failed",
                 "message": str(e),
+                "is_dir": src.is_dir(),
                 "created_at": ts,
             })
+            rollback_errors = _rollback(applied)
+            for r in results:
+                if r["status"] == "success":
+                    r["status"] = "rolled_back"
+                    r["message"] = "batch rolled back"
+            results.append({
+                "batch_id": batch_id,
+                "original_path": "",
+                "new_path": "",
+                "status": "rolled_back",
+                "message": (
+                    f"批次整体回滚（失败原因：{e}）"
+                    + (f"；回滚时另有 {len(rollback_errors)} 项失败" if rollback_errors else "")
+                ),
+                "is_dir": False,
+                "created_at": ts,
+            })
+            break
 
     return batch_id, results
+
+
+def _rollback(applied: List[Tuple[Path, Path]]) -> List[str]:
+    """Reverse the applied renames, newest first. Returns error messages."""
+    errors: List[str] = []
+    for src, dst in reversed(applied):
+        try:
+            if dst.exists() and not src.exists():
+                dst.rename(src)
+        except Exception as e:  # pragma: no cover - defensive
+            errors.append(f"{dst} -> {src}: {e}")
+    return errors
+

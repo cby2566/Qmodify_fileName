@@ -1,10 +1,16 @@
 export const API_BASE = '/api'
 
-export async function scanDirectory(path, extensions, recursive = false, maxDepth = 3) {
+export async function scanDirectory(path, extensions, recursive = false, maxDepth = 3, targetType = 'file') {
   const res = await fetch(`${API_BASE}/files/scan`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, extensions, recursive, max_depth: maxDepth })
+    body: JSON.stringify({
+      path,
+      extensions,
+      recursive,
+      max_depth: maxDepth,
+      target_type: targetType
+    })
   })
   const data = await res.json()
   return Array.isArray(data) ? { files: data } : data

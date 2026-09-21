@@ -10,16 +10,19 @@
       v-loading="fileStore.loading"
     >
       <el-table-column type="selection" width="50" :selectable="isSelectable" reserve-selection />
-      <el-table-column prop="filename" label="当前文件名" min-width="250" show-overflow-tooltip>
+      <el-table-column prop="filename" label="当前名称" min-width="250" show-overflow-tooltip>
         <template #default="{ row }">
-          <span
-            :class="['clickable-name', { 'copied-flash': copiedKey === row.full_path }]"
-            :title="isCopyableName(row.filename) ? '点击复制' : ''"
-            @click="copyName(row.filename, row)"
-          >{{ row.filename }}</span>
+          <span class="name-cell">
+            <el-icon v-if="row.is_dir" class="dir-icon"><Folder /></el-icon>
+            <span
+              :class="['clickable-name', { 'copied-flash': copiedKey === row.full_path }]"
+              :title="isCopyableName(row.filename) ? '点击复制' : ''"
+              @click="copyName(row.filename, row)"
+            >{{ row.filename }}</span>
+          </span>
         </template>
       </el-table-column>
-      <el-table-column label="新文件名" min-width="250" show-overflow-tooltip>
+      <el-table-column label="新名称" min-width="250" show-overflow-tooltip>
         <template #default="{ row }">
           <span
             :class="[getNewNameClass(row), 'clickable-name', { 'copied-flash': copiedKey === row.full_path }]"
@@ -30,10 +33,15 @@
           </span>
         </template>
       </el-table-column>
-      <el-table-column prop="size_display" label="大小" width="100" sortable />
-      <el-table-column label="类型" width="70">
+      <el-table-column label="大小" width="100" sortable :sort-by="sortBySize">
         <template #default="{ row }">
-          <span class="clickable-ext" @click="showDetail(row)">{{ row.extension || '-' }}</span>
+          <span :class="{ 'text-muted': row.is_dir }">{{ row.is_dir ? '—' : row.size_display }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="类型" width="80">
+        <template #default="{ row }">
+          <span v-if="row.is_dir" class="clickable-ext" @click="showDetail(row)">文件夹</span>
+          <span v-else class="clickable-ext" @click="showDetail(row)">{{ row.extension || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="状态" width="90">
@@ -46,7 +54,7 @@
           >{{ getStatusText(row) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right">
+      <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
           <el-button type="warning" link size="small" @click="handleQuickAdd(row)">快速</el-button>
           <el-button type="primary" link size="small" @click="handleOpen(row)">
@@ -74,6 +82,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Folder } from '@element-plus/icons-vue'
 import { useFileStore } from '../stores/files'
 import { useRenameStore } from '../stores/rename'
 import { useSettingsStore } from '../stores/settings'
@@ -128,6 +137,11 @@ function findPreviewResult(row) {
 function isSelectable(row) {
   const result = findPreviewResult(row)
   return !result || result.status === 'normal'
+}
+
+// Directories sort below files of the same "size"; they have no real size.
+function sortBySize(row) {
+  return row.is_dir ? -1 : (row.size_bytes || 0)
 }
 
 function getNewName(row) {
@@ -206,11 +220,12 @@ async function handleOpen(row) {
 
 function getOpenLabel(row) {
   const result = openResults.value[row.full_path]
-  if (!result) return '打开'
+  const noun = row.is_dir ? '打开目录' : '打开'
+  if (!result) return noun
   if (result.status === 'loading') return '打开中'
   if (result.status === 'opened') return '已打开'
   if (result.status === 'failed') return '打开失败'
-  return '打开'
+  return noun
 }
 
 function handleQuickAdd(row) {
@@ -285,6 +300,8 @@ function showDetail(row) {
 .clickable-name:hover { color: #409eff; }
 .clickable-name:not(.clickable-name:hover) { cursor: default; }
 .clickable-ext { cursor: pointer; color: #409eff; }
+.name-cell { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.dir-icon { color: #e6a23c; flex: 0 0 auto; }
 .copied-flash { background-color: #ecf5ff; border-radius: 2px; }
 .clickable-status { cursor: pointer; transition: all 0.3s; }
 .clickable-status:hover { opacity: 0.7; transform: scale(1.05); }

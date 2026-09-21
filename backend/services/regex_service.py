@@ -12,6 +12,16 @@ def validate_pattern(pattern: str) -> Tuple[bool, Optional[str]]:
         return False, str(e)
 
 
+def _rename_target(path_str: str) -> str:
+    """Return the part of a path that rename rules operate on.
+
+    Files expose their stem (extension is preserved separately); directories
+    expose their whole name, since a directory has no extension concept.
+    """
+    p = Path(path_str)
+    return p.name if p.is_dir() else p.stem
+
+
 def extract_fields(
     files: List[Union[str, object]],
     pattern: str,
@@ -35,10 +45,10 @@ def extract_fields(
         # Handle both string paths and FileInfo objects
         if isinstance(f, str):
             fpath = f
-            stem = Path(f).stem
+            stem = _rename_target(str(f))
         else:
             fpath = f.full_path
-            stem = f.stem
+            stem = f.stem if not getattr(f, "is_dir", False) else f.filename
         
         m = compiled.search(stem)
         if not m:

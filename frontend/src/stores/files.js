@@ -19,6 +19,8 @@ export const useFileStore = defineStore('files', () => {
   const filteredFiles = ref([])
   const selectedFiles = ref([])
   const currentPath = ref('')
+  // "file" | "dir" | "all" — mirrors the backend target_type parameter.
+  const targetType = ref('file')
   const loading = ref(false)
   const filters = ref({
     extensions: [],
@@ -31,19 +33,23 @@ export const useFileStore = defineStore('files', () => {
     keywordExclude: ''
   })
 
+  // Directories carry no meaningful size, so they never count towards totals.
   const totalSize = computed(() =>
-    filteredFiles.value.reduce((sum, f) => sum + f.size_bytes, 0)
+    filteredFiles.value.reduce((sum, f) => sum + (f.is_dir ? 0 : f.size_bytes || 0), 0)
   )
 
   const selectedSize = computed(() =>
-    selectedFiles.value.reduce((sum, f) => sum + f.size_bytes, 0)
+    selectedFiles.value.reduce((sum, f) => sum + (f.is_dir ? 0 : f.size_bytes || 0), 0)
   )
 
-  async function scan(path, extensions, recursive, maxDepth) {
+  const dirCount = computed(() => filteredFiles.value.filter(f => f.is_dir).length)
+
+  async function scan(path, extensions, recursive, maxDepth, target) {
     loading.value = true
     currentPath.value = path
+    if (target) targetType.value = target
     try {
-      const res = await scanDirectory(path, extensions, recursive, maxDepth)
+      const res = await scanDirectory(path, extensions, recursive, maxDepth, targetType.value)
       files.value = res.files || []
       filteredFiles.value = [...files.value]
       selectedFiles.value = []
@@ -73,25 +79,29 @@ export const useFileStore = defineStore('files', () => {
       const oldPath = result.original_path
       const newPath = result.new_path
       const newFilename = basename(newPath)
-      const newExtension = extname(newPath)
       for (const arr of [files.value, filteredFiles.value]) {
         const idx = arr.findIndex(f => f.full_path === oldPath)
         if (idx >= 0) {
+          const entry = arr[idx]
           arr[idx] = {
-            ...arr[idx],
+            ...entry,
             full_path: newPath,
             filename: newFilename,
-            extension: newExtension
+            // A directory has no extension; its "stem" is the whole name.
+            extension: entry.is_dir ? '' : extname(newPath),
+            stem: entry.is_dir ? newFilename : newFilename.replace(/\.[^.]*$/, '')
           }
         }
       }
       const selIdx = selectedFiles.value.findIndex(f => f.full_path === oldPath)
       if (selIdx >= 0) {
+        const entry = selectedFiles.value[selIdx]
         selectedFiles.value[selIdx] = {
-          ...selectedFiles.value[selIdx],
+          ...entry,
           full_path: newPath,
           filename: newFilename,
-          extension: newExtension
+          extension: entry.is_dir ? '' : extname(newPath),
+          stem: entry.is_dir ? newFilename : newFilename.replace(/\.[^.]*$/, '')
         }
       }
     }
@@ -118,8 +128,8 @@ export const useFileStore = defineStore('files', () => {
   }
 
   return {
-    files, filteredFiles, selectedFiles, currentPath, loading, filters,
-    totalSize, selectedSize,
+    files, filteredFiles, selectedFiles, currentPath, targetType, loading, filters,
+    totalSize, selectedSize, dirCount,
     scan, applyFilters, syncRenamedFiles, toggleFile, removeFilesByPaths
   }
 })

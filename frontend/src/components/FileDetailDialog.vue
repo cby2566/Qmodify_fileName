@@ -7,11 +7,11 @@
     :close-on-click-modal="true"
   >
     <el-descriptions v-if="file" border column="1">
-      <el-descriptions-item label="文件名">{{ file.filename }}</el-descriptions-item>
+      <el-descriptions-item :label="file.is_dir ? '文件夹名' : '文件名'">{{ file.filename }}</el-descriptions-item>
       <el-descriptions-item label="完整路径">{{ file.full_path }}</el-descriptions-item>
       <el-descriptions-item label="父目录">{{ file.parent_dir }}</el-descriptions-item>
-      <el-descriptions-item label="类型">{{ file.extension || '-' }}</el-descriptions-item>
-      <el-descriptions-item label="大小">{{ file.size_display }}</el-descriptions-item>
+      <el-descriptions-item label="类型">{{ file.is_dir ? '文件夹' : (file.extension || '-') }}</el-descriptions-item>
+      <el-descriptions-item label="大小">{{ file.is_dir ? '—' : file.size_display }}</el-descriptions-item>
       <el-descriptions-item label="创建时间">{{ formatTime(file.created_time) }}</el-descriptions-item>
       <el-descriptions-item label="修改时间">{{ formatTime(file.modified_time) }}</el-descriptions-item>
     </el-descriptions>

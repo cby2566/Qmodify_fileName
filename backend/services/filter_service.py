@@ -14,21 +14,25 @@ def _get_filter(filters: dict, snake_name: str, camel_name: str = None):
 
 
 def filter_files(files: List[FileInfo], filters: dict) -> List[FileInfo]:
-    """Apply a dict of filters to a list of FileInfo objects."""
+    """Apply a dict of filters to a list of FileInfo objects.
+
+    Directories have no extension and no meaningful size, so they pass the
+    extension filter untouched and are excluded from size filtering.
+    """
     result = list(files)
 
     extensions = _get_filter(filters, "extensions")
     if extensions:
         ext_set = {e.lower() if e.startswith(".") else f".{e.lower()}" for e in extensions}
-        result = [f for f in result if f.extension.lower() in ext_set]
+        result = [f for f in result if f.is_dir or f.extension.lower() in ext_set]
 
     size_min = _get_filter(filters, "size_min", "sizeMin")
     if size_min is not None:
-        result = [f for f in result if f.size_bytes >= int(size_min)]
+        result = [f for f in result if f.is_dir or f.size_bytes >= int(size_min)]
 
     size_max = _get_filter(filters, "size_max", "sizeMax")
     if size_max is not None:
-        result = [f for f in result if f.size_bytes <= int(size_max)]
+        result = [f for f in result if f.is_dir or f.size_bytes <= int(size_max)]
 
     date_from = _get_filter(filters, "date_from", "dateFrom")
     if date_from:
