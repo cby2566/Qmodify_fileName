@@ -62,3 +62,9 @@ docs/
 
 .codefree/
 prompt.txt
+
+# Agent workspace (local memory, not project source)
+.workbuddy/
+
+# 3D model artifacts
+*.miora
