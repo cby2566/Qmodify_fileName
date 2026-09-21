@@ -52,6 +52,16 @@ export async function filterFiles(filters) {
   return Array.isArray(data) ? { files: data } : data
 }
 
+export async function calculateDirSizes(paths) {
+  const res = await fetch(`${API_BASE}/files/dir-size`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paths })
+  })
+  if (!res.ok) throw new Error('计算目录大小失败')
+  return res.json()
+}
+
 export async function extractRegex(files, pattern) {
   const res = await fetch(`${API_BASE}/regex/extract`, {
     method: 'POST',
@@ -189,11 +199,11 @@ export async function updateSettings(data) {
   return res.json()
 }
 
-export async function openFile(filePath, openWith) {
+export async function openFile(filePath, openWith, isDir = false) {
   const res = await fetch(`${API_BASE}/open/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ file_path: filePath, open_with: openWith || '' })
+    body: JSON.stringify({ file_path: filePath, open_with: openWith || '', is_dir: isDir })
   })
   return res.json()
 }

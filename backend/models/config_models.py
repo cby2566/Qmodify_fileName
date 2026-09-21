@@ -9,3 +9,5 @@ class Settings(BaseModel):
     max_scan_depth: int = 5
     log_retention_days: int = 30
     preview_debounce_ms: int = 300
+    open_with: str = ""
+    open_dir_with: str = ""

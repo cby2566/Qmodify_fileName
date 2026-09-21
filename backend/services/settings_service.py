@@ -18,6 +18,10 @@ DEFAULTS: Dict[str, Any] = {
     "log_retention_days": 30,
     "preview_debounce_ms": 300,
     "open_with": "",
+    # Opening a directory is a different concern from opening a file: a
+    # program good for previewing files must not be used to open a folder.
+    # Empty means "use the OS file manager".
+    "open_dir_with": "",
 }
 
 

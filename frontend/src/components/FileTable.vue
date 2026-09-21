@@ -35,7 +35,7 @@
       </el-table-column>
       <el-table-column label="大小" width="100" sortable :sort-by="sortBySize">
         <template #default="{ row }">
-          <span :class="{ 'text-muted': row.is_dir }">{{ row.is_dir ? '—' : row.size_display }}</span>
+          <span :class="{ 'text-muted': row.is_dir && !sizeCell(row).value }">{{ sizeCell(row).text }}</span>
         </template>
       </el-table-column>
       <el-table-column label="类型" width="80">
@@ -65,6 +65,27 @@
       </el-table-column>
     </el-table>
     <div class="pagination">
+      <div class="pagination-left">
+        <el-button
+          v-if="fileStore.targetType === 'dir'"
+          type="primary"
+          plain
+          size="small"
+          :loading="fileStore.calculatingSize"
+          :disabled="!pageDirs.length"
+          @click="calculatePageSizes"
+        >
+          <el-icon v-if="!fileStore.calculatingSize"><Odometer /></el-icon>
+          {{ sizeButtonLabel }}
+        </el-button>
+        <span v-if="fileStore.targetType === 'dir' && pageDirs.length" class="pagination-hint">
+          本页 {{ pageDirs.length }} 个文件夹 ·
+          <template v-if="pageMeasuredAt">
+            已测量 {{ pageDirsCalculated }}/{{ pageDirs.length }}（{{ measuredAgo }}）
+          </template>
+          <template v-else>尚未测量大小</template>
+        </span>
+      </div>
       <el-pagination
         @current-page="currentPage"
         @page-size="pageSize"
@@ -80,9 +101,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Folder } from '@element-plus/icons-vue'
+import { Folder, Odometer } from '@element-plus/icons-vue'
 import { useFileStore } from '../stores/files'
 import { useRenameStore } from '../stores/rename'
 import { useSettingsStore } from '../stores/settings'
@@ -142,6 +163,75 @@ function isSelectable(row) {
 // Directories sort below files of the same "size"; they have no real size.
 function sortBySize(row) {
   return row.is_dir ? -1 : (row.size_bytes || 0)
+}
+
+// Directories show a placeholder until the user asks for their size.
+function sizeCell(row) {
+  if (!row.is_dir) return { text: row.size_display, value: row.size_bytes || 0 }
+  const cached = fileStore.sizeOf(row.full_path)
+  if (!cached) return { text: '—', value: 0 }
+  if (cached.error) return { text: cached.error === '计算失败' ? '计算失败' : '不可读', value: 0 }
+  return { text: cached.size_display + (cached.truncated ? '+' : ''), value: cached.size_bytes }
+}
+
+// Only the rows the user can actually see are ever measured.
+const pageDirs = computed(() => paginatedFiles.value.filter(f => f.is_dir))
+
+const pageDirsCalculated = computed(
+  () => pageDirs.value.filter(f => !!fileStore.sizeOf(f.full_path)).length
+)
+
+// Ticking clock so the "measured N minutes ago" label stays honest without
+// the user having to re-render anything. Cheap: 1 timer per 30s.
+const now = ref(Date.now())
+let clockTimer = null
+onMounted(() => {
+  clockTimer = setInterval(() => { now.value = Date.now() }, 30_000)
+})
+onUnmounted(() => {
+  if (clockTimer) clearInterval(clockTimer)
+  clockTimer = null
+})
+
+// When this page was last measured. Shown to the user because a folder's size
+// is a snapshot, not a live value — contents may have changed since.
+const pageMeasuredAt = computed(() =>
+  fileStore.lastMeasuredAt(pageDirs.value.map(f => f.full_path))
+)
+
+const measuredAgo = computed(() => {
+  if (!pageMeasuredAt.value) return ''
+  const secs = Math.max(0, Math.round((now.value - pageMeasuredAt.value) / 1000))
+  if (secs < 45) return '刚刚'
+  if (secs < 3600) return `${Math.round(secs / 60)} 分钟前`
+  return `${Math.round(secs / 3600)} 小时前`
+})
+
+const sizeButtonLabel = computed(() => {
+  if (fileStore.calculatingSize) return '计算中...'
+  const total = pageDirs.value.length
+  if (!total) return '计算本页大小'
+  // Once measured, the button re-measures: a cached value is never assumed
+  // to still be current, because folder contents change under our feet.
+  if (pageDirsCalculated.value >= total) return '重新计算本页'
+  return `计算本页大小 (${total - pageDirsCalculated.value})`
+})
+
+async function calculatePageSizes() {
+  const paths = pageDirs.value.map(f => f.full_path)
+  if (!paths.length) return
+  try {
+    // Always measure the whole page; never skip paths just because a stale
+    // value happens to be cached.
+    const { measured, failed } = await fileStore.calculateSizes(paths)
+    if (failed) {
+      ElMessage.warning(`已重算 ${measured} 个文件夹，${failed} 个读取失败`)
+    } else {
+      ElMessage.success(`已重算本页 ${measured} 个文件夹的大小`)
+    }
+  } catch (e) {
+    ElMessage.error('计算失败: ' + (e?.message || e))
+  }
 }
 
 function getNewName(row) {
@@ -206,11 +296,16 @@ const settingsStore = useSettingsStore()
 
 async function handleOpen(row) {
   openResults.value[row.full_path] = { status: 'loading' }
-  const openWith = settingsStore.settings.open_with || ''
+  // Files and directories have independent open-with settings: a program
+  // chosen for previewing files must not be used to open a folder.
+  const openWith = row.is_dir
+    ? (settingsStore.settings.open_dir_with || '')
+    : (settingsStore.settings.open_with || '')
   try {
-    await openFile(row.full_path, openWith)
+    await openFile(row.full_path, openWith, !!row.is_dir)
     openResults.value[row.full_path] = { status: "opened" }
-    ElMessage.success('已打开')
+    const target = openWith ? '已用指定程序打开' : (row.is_dir ? '已在资源管理器中打开' : '已打开')
+    ElMessage.success(target)
   } catch (e) {
     const message = e.message || '未知错误'
     openResults.value[row.full_path] = { status: "failed", message }
@@ -289,7 +384,9 @@ function showDetail(row) {
 
 <style scoped>
 .file-table-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-.pagination { padding: 12px; display: flex; justify-content: center; border-top: 1px solid #e4e7ed; }
+.pagination { padding: 12px; display: flex; justify-content: center; align-items: center; gap: 16px; border-top: 1px solid #e4e7ed; }
+.pagination-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.pagination-hint { font-size: 12px; color: #909399; white-space: nowrap; }
 .text-danger { color: #f56c6c; font-weight: 500; }
 .text-success { color: #3595f5; }
 .text-muted { color: #909399; }

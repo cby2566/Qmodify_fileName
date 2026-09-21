@@ -11,6 +11,7 @@ export const useSettingsStore = defineStore('settings', () => {
     log_retention_days: 90,
     preview_debounce_ms: 300,
     open_with: "",
+    open_dir_with: "",
     quick_add_text: '_new',
     quick_add_mode: 'prefix'
   })

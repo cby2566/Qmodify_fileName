@@ -156,7 +156,7 @@
         label-width="120px"
         class="settings-form"
       >
-        <el-form-item label="打开方式">
+        <el-form-item label="文件打开方式">
           <el-input
             v-model="settingsStore.settings.open_with"
             placeholder="留空使用系统默认，填写程序路径"
@@ -167,6 +167,21 @@
               <el-icon><FolderOpened /></el-icon>
             </template>
           </el-input>
+          <div class="setting-tip">💡 用于列表中「打开」文件，如 <code>D:\Honeyview\Honeyview.exe</code></div>
+        </el-form-item>
+
+        <el-form-item label="目录打开方式">
+          <el-input
+            v-model="settingsStore.settings.open_dir_with"
+            placeholder="留空使用系统资源管理器"
+            clearable
+            class="full-width-input"
+          >
+            <template #prepend>
+              <el-icon><Folder /></el-icon>
+            </template>
+          </el-input>
+          <div class="setting-tip">💡 用于文件夹模式下的「打开目录」。留空则调用系统文件资源管理器；填写程序路径（如 <code>C:\Program Files\...\TotalCMD64.exe</code>）可改用第三方管理器</div>
         </el-form-item>
 
         <el-form-item label="预览防抖">
@@ -217,6 +232,7 @@ import {
   Search,
   Setting,
   FolderOpened,
+  Folder,
   EditPen,
   Check
 } from '@element-plus/icons-vue'

@@ -14,6 +14,7 @@ class SettingsUpdate(BaseModel):
     log_retention_days: Optional[int] = None
     preview_debounce_ms: Optional[int] = None
     open_with: Optional[str] = None
+    open_dir_with: Optional[str] = None
 
 
 @router.get("/")
