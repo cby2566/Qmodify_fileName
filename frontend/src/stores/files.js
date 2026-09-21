@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { scanDirectory, filterFiles } from '../api'
+import { scanDirectory, filterFiles, calculateDirSizes } from '../api'
 import { useRenameStore } from './rename'
 
 function basename(p) {
@@ -53,6 +53,8 @@ export const useFileStore = defineStore('files', () => {
       files.value = res.files || []
       filteredFiles.value = [...files.value]
       selectedFiles.value = []
+      // A new scan invalidates every previously measured directory.
+      dirSizeCache.value = {}
       useRenameStore().previewResults = []
     } finally {
       loading.value = false
@@ -73,12 +75,95 @@ export const useFileStore = defineStore('files', () => {
     }
   }
 
+  // Directory sizes are measured on demand and cached per path. The cache is a
+  // record of a past measurement, never a claim that the value is current: a
+  // folder's contents can change at any moment, so every click re-measures.
+  // Each entry carries the timestamp of its measurement so the UI can show age.
+  const dirSizeCache = ref({})
+  const calculatingSize = ref(false)
+
+  // Measure the given paths, always overwriting previous values.
+  // `onlyPending` keeps the old behaviour of skipping already-measured paths.
+  async function calculateSizes(paths, { onlyPending = false } = {}) {
+    const targets = onlyPending
+      ? paths.filter(p => dirSizeCache.value[p] === undefined)
+      : [...paths]
+    if (!targets.length) return { measured: 0, total: paths.length, failed: 0 }
+
+    calculatingSize.value = true
+    try {
+      const res = await calculateDirSizes(targets)
+      const results = res.results || []
+      const next = { ...dirSizeCache.value }
+      const byPath = new Map(files.value.map(f => [f.full_path, f]))
+      const measuredAt = Date.now()
+      let ok = 0
+      let failed = 0
+      for (const r of results) {
+        if (!r.success) {
+          failed += 1
+          next[r.path] = { error: r.error || '计算失败', measured_at: measuredAt }
+          continue
+        }
+        ok += 1
+        next[r.path] = {
+          size_bytes: r.size_bytes,
+          size_display: r.size_display,
+          file_count: r.file_count,
+          truncated: r.truncated,
+          measured_at: measuredAt
+        }
+        // Keep the row itself in sync so sorting and detail dialogs agree.
+        const entry = byPath.get(r.path)
+        if (entry) {
+          entry.size_bytes = r.size_bytes
+          entry.size_display = r.size_display
+        }
+      }
+      dirSizeCache.value = next
+      return { measured: ok, total: paths.length, failed }
+    } finally {
+      calculatingSize.value = false
+    }
+  }
+
+  function sizeOf(fullPath) {
+    return dirSizeCache.value[fullPath]
+  }
+
+  // When the given paths were measured. Returns null if none were, and the
+  // OLDEST measurement time otherwise — the honest "how stale could this be"
+  // answer when a page mixes freshly measured and long-cached folders.
+  function lastMeasuredAt(paths) {
+    let oldest = null
+    for (const p of paths) {
+      const at = dirSizeCache.value[p]?.measured_at
+      if (typeof at !== 'number') continue
+      if (oldest === null || at < oldest) oldest = at
+    }
+    return oldest
+  }
+
+  function clearDirSizeCache() {
+    dirSizeCache.value = {}
+  }
+
   function syncRenamedFiles(results) {
+    let cacheChanged = false
+    const nextCache = { ...dirSizeCache.value }
     for (const result of results) {
       if (result.status !== 'success') continue
       const oldPath = result.original_path
       const newPath = result.new_path
       const newFilename = basename(newPath)
+      // A measured size belongs to a path, so a rename either moves the entry
+      // with it (contents identical) or leaves a value under a path that no
+      // longer exists. Renaming the folder itself keeps the measurement valid.
+      if (nextCache[oldPath] !== undefined) {
+        nextCache[newPath] = nextCache[oldPath]
+        delete nextCache[oldPath]
+        cacheChanged = true
+      }
       for (const arr of [files.value, filteredFiles.value]) {
         const idx = arr.findIndex(f => f.full_path === oldPath)
         if (idx >= 0) {
@@ -105,6 +190,7 @@ export const useFileStore = defineStore('files', () => {
         }
       }
     }
+    if (cacheChanged) dirSizeCache.value = nextCache
   }
 
   function toggleFile(file) {
@@ -130,6 +216,8 @@ export const useFileStore = defineStore('files', () => {
   return {
     files, filteredFiles, selectedFiles, currentPath, targetType, loading, filters,
     totalSize, selectedSize, dirCount,
-    scan, applyFilters, syncRenamedFiles, toggleFile, removeFilesByPaths
+    dirSizeCache, calculatingSize,
+    scan, applyFilters, syncRenamedFiles, toggleFile, removeFilesByPaths,
+    calculateSizes, sizeOf, lastMeasuredAt, clearDirSizeCache
   }
 })
