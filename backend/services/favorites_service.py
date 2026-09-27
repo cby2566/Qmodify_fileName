@@ -23,11 +23,15 @@ def _load() -> List[dict]:
 
 
 def _save(items: List[dict]):
+    # Atomic write: dump to a temp file first, then os.replace it over the
+    # real one. A crash mid-write can no longer leave a truncated JSON.
     DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
-    DATA_PATH.write_text(
+    tmp_path = DATA_PATH.with_name(DATA_PATH.name + ".tmp")
+    tmp_path.write_text(
         json.dumps(items, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    os.replace(tmp_path, DATA_PATH)
 
 
 def list_favorites() -> List[dict]:
