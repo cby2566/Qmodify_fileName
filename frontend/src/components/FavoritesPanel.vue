@@ -8,7 +8,7 @@
         v-for="fav in favoritesStore.favorites"
         :key="fav.id"
         class="favorite-item"
-        @click="$emit('selectPattern', fav.pattern)"
+        @click="$emit('selectPattern', fav.pattern, fav.id)"
       >
         <el-icon><Star /></el-icon>
         <span>{{ fav.name }}</span>

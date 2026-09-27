@@ -165,6 +165,11 @@ export async function deleteFavorite(id) {
   return res.json()
 }
 
+export async function touchFavorite(id) {
+  const res = await fetch(`${API_BASE}/favorites/${id}/touch`, { method: 'POST' })
+  return res.json()
+}
+
 export async function getLogs(params = {}) {
   const query = new URLSearchParams(params).toString()
   const res = await fetch(`${API_BASE}/logs?${query}`)

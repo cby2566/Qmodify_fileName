@@ -59,8 +59,10 @@ import LogsPanel from './components/LogsPanel.vue'
 import FavoritesManager from './components/FavoritesManager.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import { useRenameStore } from './stores/rename'
+import { useFavoritesStore } from './stores/favorites'
 
 const renameStore = useRenameStore()
+const favoritesStore = useFavoritesStore()
 const showLogs = ref(false)
 const showFavorites = ref(false)
 const showSettings = ref(false)
@@ -102,8 +104,11 @@ function toggleSidebar() {
   localStorage.setItem('sidebar_collapsed', String(sidebarCollapsed.value))
 }
 
-function onSelectPattern(pattern) {
+function onSelectPattern(pattern, favoriteId) {
   renameStore.regexPattern = pattern
+  if (favoriteId) {
+    favoritesStore.touch(favoriteId)
+  }
 }
 
 onBeforeUnmount(() => {

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { getFavorites, addFavorite, updateFavorite, deleteFavorite } from '../api'
+import { getFavorites, addFavorite, updateFavorite, deleteFavorite, touchFavorite } from '../api'
 
 export const useFavoritesStore = defineStore('favorites', () => {
   const favorites = ref([])
@@ -33,5 +33,17 @@ export const useFavoritesStore = defineStore('favorites', () => {
     await fetch()
   }
 
-  return { favorites, loading, fetch, add, update, remove }
+  async function touch(id) {
+    try {
+      const res = await touchFavorite(id)
+      const item = favorites.value.find((f) => f.id === id)
+      if (item && res && res.last_used_at) {
+        item.last_used_at = res.last_used_at
+      }
+    } catch (e) {
+      // 使用统计失败不应阻断主流程，静默忽略
+    }
+  }
+
+  return { favorites, loading, fetch, add, update, remove, touch }
 })
