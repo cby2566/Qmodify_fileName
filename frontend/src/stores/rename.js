@@ -52,7 +52,17 @@ export const useRenameStore = defineStore('rename', () => {
     }
     loading.value = true
     try {
-      const filePaths = files.map(f => f.full_path)
+      // Drop entries whose path is no longer in the scanned file list: they
+      // are stale row objects (e.g. left over in the table's selection), and
+      // previewing them would invent phantom conflicts against files that
+      // were already renamed.
+      const fileStore = useFileStore()
+      const livePaths = new Set(fileStore.files.map(f => f.full_path))
+      const filePaths = files.map(f => f.full_path).filter(p => livePaths.has(p))
+      if (!filePaths.length) {
+        previewResults.value = []
+        return
+      }
       const res = await previewRename(filePaths, rules.value, regexPattern.value)
       previewResults.value = res || []
     } finally {

@@ -148,6 +148,12 @@ export const useFileStore = defineStore('files', () => {
     dirSizeCache.value = {}
   }
 
+  // Rename a row by MUTATING it in place, never by swapping in a new object:
+  // el-table's reserve-selection holds on to the exact row objects it was
+  // given, so replacing the object leaves the table clutching a stale copy
+  // whose full_path no longer exists on disk (which later previews as a
+  // phantom conflict). Mutating keeps every reference -- including the
+  // table's internal selection -- pointing at the up-to-date path.
   function syncRenamedFiles(results) {
     let cacheChanged = false
     const nextCache = { ...dirSizeCache.value }
@@ -164,29 +170,14 @@ export const useFileStore = defineStore('files', () => {
         delete nextCache[oldPath]
         cacheChanged = true
       }
-      for (const arr of [files.value, filteredFiles.value]) {
-        const idx = arr.findIndex(f => f.full_path === oldPath)
-        if (idx >= 0) {
-          const entry = arr[idx]
-          arr[idx] = {
-            ...entry,
-            full_path: newPath,
-            filename: newFilename,
-            // A directory has no extension; its "stem" is the whole name.
-            extension: entry.is_dir ? '' : extname(newPath),
-            stem: entry.is_dir ? newFilename : newFilename.replace(/\.[^.]*$/, '')
-          }
-        }
-      }
-      const selIdx = selectedFiles.value.findIndex(f => f.full_path === oldPath)
-      if (selIdx >= 0) {
-        const entry = selectedFiles.value[selIdx]
-        selectedFiles.value[selIdx] = {
-          ...entry,
-          full_path: newPath,
-          filename: newFilename,
-          extension: entry.is_dir ? '' : extname(newPath),
-          stem: entry.is_dir ? newFilename : newFilename.replace(/\.[^.]*$/, '')
+      for (const arr of [files.value, filteredFiles.value, selectedFiles.value]) {
+        const entry = arr.find(f => f.full_path === oldPath)
+        if (entry) {
+          entry.full_path = newPath
+          entry.filename = newFilename
+          // A directory has no extension; its "stem" is the whole name.
+          entry.extension = entry.is_dir ? '' : extname(newPath)
+          entry.stem = entry.is_dir ? newFilename : newFilename.replace(/\.[^.]*$/, '')
         }
       }
     }
