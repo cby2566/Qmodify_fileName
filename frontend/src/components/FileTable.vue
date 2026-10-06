@@ -108,7 +108,7 @@ import { useFileStore } from '../stores/files'
 import { useRenameStore } from '../stores/rename'
 import { useSettingsStore } from '../stores/settings'
 import { openFile } from '../api'
-import { computeFilenameDiff } from '../utils/index'
+import { computeFilenameDiff, segmentsFromSpans } from '../utils/index'
 import FileDetailDialog from './FileDetailDialog.vue'
 
 const fileStore = useFileStore()
@@ -254,6 +254,12 @@ function getNewNameSegments(row) {
   const result = findPreviewResult(row)
   if (!result) return [{ text: '-', type: 'unchanged' }]
   if (result.status === 'renamed') return [{ text: '(已重命名)', type: 'unchanged' }]
+  // Prefer engine-provided rule spans (plan C); fall back to string diff for
+  // legacy payloads, deletion-only results, or malformed spans.
+  if (Array.isArray(result.spans) && result.spans.length > 0) {
+    const segs = segmentsFromSpans(result.new_name, result.spans)
+    if (segs) return segs
+  }
   return computeFilenameDiff(result.original_name, result.new_name)
 }
 
